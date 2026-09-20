@@ -447,6 +447,19 @@ export interface VehicleRow {
   scoredAt: string | null;
 }
 
+export interface BatteryWarrantyView {
+  status: string | null;
+  limitingFactor: string | null;
+  start: string | null;
+  end: string | null;
+  asOf: string | null;
+  months: number | null;
+  daysRemaining: number | null;
+  distanceKm: number | null;
+  distanceRemainingKm: number | null;
+  odometerKm: number | null;
+}
+
 export interface VehicleDetailView extends VehicleRow {
   dimensions: { key: string; label: string; score: number }[];
   detectedSignals: string[];
@@ -454,6 +467,8 @@ export interface VehicleDetailView extends VehicleRow {
   businessImpact: string | null;
   suggestedChecks: string[];
   riskNote: string | null;
+  batteryWarranty: BatteryWarrantyView | null;
+  batteryWarrantyStatus: string | null;
 }
 
 export function normaliseVehicle(row: ApiVehicleSummary): VehicleRow {
@@ -481,6 +496,7 @@ export function normaliseVehicle(row: ApiVehicleSummary): VehicleRow {
 }
 
 export function normaliseVehicleDetail(detail: ApiVehicleDetail): VehicleDetailView {
+  const warranty = detail.battery_warranty;
   return {
     ...normaliseVehicle(detail),
     dimensions: Object.entries(detail.dimension_scores ?? {})
@@ -491,6 +507,21 @@ export function normaliseVehicleDetail(detail: ApiVehicleDetail): VehicleDetailV
     businessImpact: detail.business_impact ?? null,
     suggestedChecks: detail.suggested_checks ?? [],
     riskNote: detail.risk_note ?? null,
+    batteryWarranty: warranty
+      ? {
+          status: warranty.status ?? null,
+          limitingFactor: warranty.limiting_factor ?? null,
+          start: warranty.start ?? null,
+          end: warranty.end ?? null,
+          asOf: warranty.as_of ?? null,
+          months: warranty.months ?? null,
+          daysRemaining: warranty.days_remaining ?? null,
+          distanceKm: warranty.distance_km ?? null,
+          distanceRemainingKm: warranty.distance_remaining_km ?? null,
+          odometerKm: warranty.odometer_km ?? null,
+        }
+      : null,
+    batteryWarrantyStatus: detail.battery_warranty_status ?? null,
   };
 }
 

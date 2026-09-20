@@ -191,6 +191,22 @@ export interface ApiVehicleDimensionScores {
   operational?: number | null;
 }
 
+/** The vehicle's fitted battery warranty — "N months OR X km, whichever
+ * comes first". `limiting_factor` names which limit binds (time / distance);
+ * `as_of` is the fleet's latest data date the status was judged against. */
+export interface ApiVehicleBatteryWarranty {
+  status?: string | null;
+  limiting_factor?: string | null;
+  start?: string | null;
+  end?: string | null;
+  as_of?: string | null;
+  months?: number | null;
+  days_remaining?: number | null;
+  distance_km?: number | null;
+  distance_remaining_km?: number | null;
+  odometer_km?: number | null;
+}
+
 /** GET /vehicles/{asset_id} — the vehicle's own Asset 360. */
 export interface ApiVehicleDetail extends ApiVehicleSummary {
   dimension_scores?: ApiVehicleDimensionScores | null;
@@ -200,6 +216,8 @@ export interface ApiVehicleDetail extends ApiVehicleSummary {
   recommended_action?: string | null;
   suggested_checks?: string[];
   risk_note?: string | null;
+  battery_warranty?: ApiVehicleBatteryWarranty | null;
+  battery_warranty_status?: string | null;
 }
 
 // ---------------------------------------------------------------------------

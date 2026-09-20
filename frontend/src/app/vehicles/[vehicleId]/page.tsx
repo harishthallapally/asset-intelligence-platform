@@ -16,6 +16,20 @@ const CLASSIFICATION_TONE: Record<string, string> = {
   CRITICAL: "var(--status-critical)",
 };
 
+const WARRANTY_TONE: Record<string, string> = {
+  IN_WARRANTY: "var(--status-good)",
+  EXPIRING_SOON: "var(--status-warning)",
+  EXPIRED: "var(--status-critical)",
+};
+
+function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleDateString("en-IN", { dateStyle: "medium" });
+}
+
 function label(value: string | null): string {
   if (!value) return "—";
   return value
@@ -112,6 +126,60 @@ export default async function VehicleDetailPage({
             </div>
           </div>
         </Panel>
+
+        {vehicle.batteryWarranty && (
+          <Panel title="Battery Warranty">
+            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
+              <div>
+                <div className="text-[12px] text-text-muted">Status</div>
+                <div
+                  className="mt-1 text-[15px] font-semibold"
+                  style={{
+                    color: vehicle.batteryWarranty.status
+                      ? (WARRANTY_TONE[vehicle.batteryWarranty.status.toUpperCase()] ?? "var(--text-primary)")
+                      : "var(--text-primary)",
+                  }}
+                >
+                  {label(vehicle.batteryWarranty.status)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] text-text-muted">Limiting Factor</div>
+                <div className="mt-1 text-[15px] font-semibold text-text-primary">
+                  {label(vehicle.batteryWarranty.limitingFactor)}
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] text-text-muted">Days Remaining</div>
+                <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                  {vehicle.batteryWarranty.daysRemaining ?? "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] text-text-muted">Distance Remaining</div>
+                <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                  {vehicle.batteryWarranty.distanceRemainingKm != null
+                    ? `${vehicle.batteryWarranty.distanceRemainingKm.toLocaleString("en-IN")} km`
+                    : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] text-text-muted">Odometer</div>
+                <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                  {vehicle.batteryWarranty.odometerKm != null
+                    ? `${vehicle.batteryWarranty.odometerKm.toLocaleString("en-IN")} km`
+                    : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-[12px] text-text-muted">Coverage</div>
+                <div className="mt-1 text-[13px] font-medium text-text-primary">
+                  {formatDate(vehicle.batteryWarranty.start)} – {formatDate(vehicle.batteryWarranty.end)}
+                </div>
+              </div>
+            </div>
+          </Panel>
+        )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Panel title="Health Dimensions">
