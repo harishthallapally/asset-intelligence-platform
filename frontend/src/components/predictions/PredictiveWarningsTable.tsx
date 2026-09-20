@@ -10,9 +10,6 @@ const TYPE_LABEL: Record<string, string> = {
   STATION: "Station",
   DOCK: "Dock",
   CHARGER: "Charger",
-  // This platform has no vehicle-scoring engine — these rows come from the
-  // demo register (see lib/dummy/vehicles.ts), never left unlabelled.
-  VEHICLE: "Vehicle (Demo)",
 };
 
 export function PredictiveWarningsTable({ rows }: { rows: PredictiveWarningRow[] }) {

@@ -13,18 +13,17 @@ import { RiskSummaryPanel } from "@/components/dashboard/RiskSummaryPanel";
 import { TopAtRiskTable } from "@/components/dashboard/TopAtRiskTable";
 import { TopRiskAssets, type RankedAsset } from "@/components/dashboard/TopRiskAssets";
 import { getDashboardData } from "@/lib/api/dashboard";
-import { getDummyVehicles } from "@/lib/dummy/vehicles";
+import { getTopRiskAssets } from "@/lib/api/resources";
+import { operationsRiskHref } from "@/lib/api/normalise";
 
-/** HEALTHY is fine; WATCH/AT_RISK/CRITICAL all count as "needs attention" —
- * same three-band grouping the Vehicles table itself filters by. */
-function vehicleNeedsAttention(classification: string): boolean {
-  return classification.toUpperCase() !== "HEALTHY";
-}
-
-/** A station's risk as a 0-100 figure, so every card ranks on one scale. */
-function stationRisk(highRisk: number, atRisk: number, docks: number): number {
-  if (docks <= 0) return 0;
-  return Math.min(100, Math.round(((highRisk * 2 + atRisk) / (docks * 2)) * 100));
+/** HIGH or CRITICAL — checked directly against the API's own risk_category
+ * string (GET /operations/risk) rather than a score threshold, so "what
+ * counts as top risk" is exactly what the platform itself calls high risk.
+ * A station/charger without a merged score (that fetch failed) is never
+ * flagged, rather than guessed at. */
+function isHighRisk(row: { riskCategoryRaw: string | null }): boolean {
+  const category = row.riskCategoryRaw?.toUpperCase();
+  return category === "HIGH" || category === "CRITICAL";
 }
 
 export default async function DashboardPage({
@@ -35,77 +34,71 @@ export default async function DashboardPage({
   // The header's date control writes the trend window here.
   const { days } = await searchParams;
   const trendDays = Math.min(365, Math.max(1, Number(days) || 7));
-  const { data, stations, chargers } = await getDashboardData(trendDays);
+  const [{ data, stations, chargers }, topRiskRows] = await Promise.all([
+    getDashboardData(trendDays),
+    // GET /operations/risk's own cross-asset-type ranking, mix=balanced so
+    // batteries (3,124 of them) don't crowd out stations/chargers/docks (26,
+    // 390, 390) — the platform's own answer to "what needs attention right
+    // now", not a client-side recombination of separate per-type lists.
+    getTopRiskAssets(10),
+  ]);
   const { stations: stationCounts, chargers: chargerCounts, batteries } = data;
 
   // Each card ranks its own assets and shows only the top few, so the layout
   // holds whether the fleet has three assets or three thousand — what changes
-  // is which ones surface.
+  // is which ones surface. Risk is always the real score from GET
+  // /operations/risk (the station/charger's own riskiest dock, merged in by
+  // getDashboardData) — offline never overrides it with a fabricated number,
+  // it's just an extra tag alongside the real figure.
   const stationItems: RiskItem[] = stations.map((station) => ({
     id: station.stationId,
     href: `/stations/${station.stationId}`,
-    detail: station.online
-      ? `${station.highRiskDocks} high-risk of ${station.dockCount} docks · health ${station.avgHealthScore}`
-      : "Station offline",
-    risk: station.online
-      ? stationRisk(station.highRiskDocks, station.atRiskDocks, station.dockCount)
-      : 100,
-    tag: station.online ? undefined : "Offline",
+    detail: station.likelyIssue ?? (station.online ? "No issue reported" : "Station offline"),
+    risk: station.riskScore ?? 0,
+    tag: !station.online ? "Offline" : (station.priority ?? undefined),
   }));
 
   // charger_id repeats across stations (CHG01..CHG15 reused at every
   // station), so the row key and link both need the station id too.
   const chargerItems: RiskItem[] = chargers
-    .filter((charger) => charger.faulty || !charger.online)
+    .filter((charger) => charger.faulty || !charger.online || isHighRisk(charger))
     .map((charger) => ({
       id: charger.chargerId,
       key: `${charger.stationId}-${charger.chargerId}`,
       href: `/chargers/${charger.chargerId}?station=${charger.stationId}`,
-      detail: `${charger.dockId} · ${charger.stationId}`,
-      risk: charger.faulty ? 90 : 60,
-      tag: charger.faulty ? "Faulty" : "Offline",
+      detail: charger.likelyIssue ?? `${charger.dockId} · ${charger.stationId}`,
+      risk: charger.riskScore ?? 0,
+      tag: charger.faulty ? "Faulty" : !charger.online ? "Offline" : (charger.priority ?? undefined),
     }));
 
-  // One ranked list across every asset type, so the operator sees what to act
-  // on first without visiting three screens.
-  const topRiskAssets: RankedAsset[] = [
-    ...data.atRisk.map((row) => ({
-      id: row.batteryId,
-      kind: "battery" as const,
-      href: `/batteries/${row.batteryId}`,
-      issue: row.likelyIssue,
-      location: row.stationId ?? "",
-      risk: row.riskScore,
-      tag: row.priority,
-    })),
-    ...chargers
-      .filter((charger) => charger.faulty || !charger.online)
-      .map((charger) => ({
-        id: charger.chargerId,
-        key: `charger-${charger.stationId}-${charger.chargerId}`,
-        kind: "charger" as const,
-        href: `/chargers/${charger.chargerId}?station=${charger.stationId}`,
-        issue: charger.faulty ? "Charger fault reported" : "Charger not reporting",
-        location: `${charger.dockId} · ${charger.stationId}`,
-        risk: charger.faulty ? 90 : 60,
-        tag: charger.faulty ? "Faulty" : "Offline",
-      })),
-    ...stations
-      .filter((station) => !station.online || station.highRiskDocks > 0)
-      .map((station) => ({
-        id: station.stationId,
-        kind: "station" as const,
-        href: `/stations/${station.stationId}`,
-        issue: station.online
-          ? `${station.highRiskDocks} high-risk docks of ${station.dockCount}`
-          : "Station offline",
-        location: `avg health ${station.avgHealthScore}`,
-        risk: station.online
-          ? stationRisk(station.highRiskDocks, station.atRiskDocks, station.dockCount)
-          : 100,
-        tag: station.online ? "At risk" : "Offline",
-      })),
-  ];
+  // GET /operations/risk's own cross-asset-type row -> this panel's shape.
+  // `kind` and `href` both fall through to null for a row this UI has no
+  // page for, so any future asset_type the API adds is dropped rather than
+  // rendered broken.
+  const KIND_BY_ASSET_TYPE: Record<string, RankedAsset["kind"]> = {
+    BATTERY: "battery",
+    CHARGER: "charger",
+    STATION: "station",
+    DOCK: "dock",
+    VEHICLE: "vehicle",
+  };
+  const topRiskAssets: RankedAsset[] = topRiskRows.flatMap((row) => {
+    const kind = KIND_BY_ASSET_TYPE[row.assetType.toUpperCase()];
+    const href = operationsRiskHref(row);
+    if (!kind || !href) return [];
+    return [
+      {
+        id: row.assetId,
+        key: `${kind}-${row.assetId}`,
+        kind,
+        href,
+        issue: row.likelyIssue ?? "No issue reported",
+        location: row.location ?? "",
+        risk: row.riskScore,
+        tag: row.priority,
+      },
+    ];
+  });
 
   const batteryItems: RiskItem[] = data.atRisk.map((row) => ({
     id: row.batteryId,
@@ -115,40 +108,26 @@ export default async function DashboardPage({
     tag: row.priority,
   }));
 
-  // Demo data — this platform has no vehicle-telemetry service yet (see
-  // lib/dummy/vehicles.ts). Included so Vehicles shows up on the dashboard
-  // like every other asset type, flagged "Demo" everywhere it appears.
-  const vehicles = getDummyVehicles();
-  const vehiclesOnline = vehicles.filter((v) => v.online).length;
-  const vehiclesAtRisk = vehicles.filter((v) => vehicleNeedsAttention(v.healthClassification));
-  const vehicleItems: RiskItem[] = vehiclesAtRisk.map((v) => ({
-    id: v.vehicleId,
-    href: `/vehicles/${v.vehicleId}`,
-    detail: v.likelyIssue,
-    risk: v.riskScore,
-    tag: `${v.priority} · Demo`,
-  }));
-
-  topRiskAssets.push(
-    ...vehiclesAtRisk.map((v) => ({
-      id: v.vehicleId,
-      key: `vehicle-${v.vehicleId}`,
-      kind: "vehicle" as const,
-      href: `/vehicles/${v.vehicleId}`,
-      issue: v.likelyIssue,
-      location: v.stationId,
-      risk: v.riskScore,
-      tag: v.priority,
-    })),
-  );
+  // No dedicated top-at-risk-vehicles fetch yet — reuses the same
+  // cross-asset-type ranking the Top Risk Assets panel already fetched.
+  const vehicleItems: RiskItem[] = topRiskAssets
+    .filter((asset) => asset.kind === "vehicle")
+    .map((asset) => ({
+      id: asset.id,
+      key: asset.key,
+      href: asset.href,
+      detail: asset.issue,
+      risk: asset.risk,
+      tag: asset.tag,
+    }));
 
   return (
-    <PageShell title="Dashboard" subtitle="Overview of Stations, Chargers, Batteries & Vehicles">
+    <PageShell title="Dashboard" subtitle="Overview of Stations, Chargers & Batteries">
       <div className="flex flex-col gap-3">
         <DataSourceBadge source={data.source} />
         <CriticalAlertBanner rows={data.atRisk} />
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${data.vehicles ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
           <StatCard
             icon={Warehouse}
             iconBg="color-mix(in srgb, var(--series-7) 12%, transparent)"
@@ -195,31 +174,35 @@ export default async function DashboardPage({
             items={batteryItems}
             emptyMessage="No battery above the Low risk band."
           />
-          <StatCard
-            icon={Bike}
-            iconBg="color-mix(in srgb, var(--series-5) 12%, transparent)"
-            iconColor="var(--series-5)"
-            label="Vehicles (2W) · Demo"
-            value={vehicles.length}
-            href="/vehicles"
-            breakdown={[
-              { label: "Online", value: vehiclesOnline, tone: "good" },
-              { label: "Offline", value: vehicles.length - vehiclesOnline, tone: "critical" },
-              { label: "Needs attention", value: vehiclesAtRisk.length, tone: "warning" },
-            ]}
-            items={vehicleItems}
-            emptyMessage="All demo vehicles healthy."
-          />
+          {data.vehicles && (
+            <StatCard
+              icon={Bike}
+              iconBg="color-mix(in srgb, var(--series-2) 12%, transparent)"
+              iconColor="var(--series-2)"
+              label="Vehicles"
+              value={data.vehicles.total}
+              href="/vehicles"
+              breakdown={[
+                ...(data.vehicles.overallHealth != null
+                  ? [{ label: "Health", value: `${Math.round(data.vehicles.overallHealth)}/100`, tone: "good" as const }]
+                  : []),
+                { label: "High risk", value: data.vehicles.highRisk, tone: "warning" as const },
+                { label: "Predicted", value: data.vehicles.predictedFailures, tone: "critical" as const },
+              ]}
+              items={vehicleItems}
+              emptyMessage="No vehicle above the Low risk band."
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <Panel
             title="Top Risk Assets"
-            titleNote="(all asset types, incl. demo vehicles)"
+            titleNote="(top 5, balanced across asset types)"
             className="lg:col-span-7"
             action={<ViewAllLink href="/ai-predictions" />}
           >
-            <TopRiskAssets assets={topRiskAssets} limit={6} />
+            <TopRiskAssets assets={topRiskAssets} limit={5} />
           </Panel>
 
           <Panel title="Top Critical Alerts" className="lg:col-span-5" action={<ViewAllLink href="/alerts" />}>

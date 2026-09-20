@@ -11,6 +11,7 @@ import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { getStationDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
+import { healthConditionColor, riskWarningColor } from "@/lib/riskColor";
 
 function label(value: string): string {
   return value
@@ -106,7 +107,7 @@ export default async function StationDetailPage({
                   <div className="text-[12px] text-text-muted">Condition</div>
                   <div
                     className="mt-1 text-[15px] font-semibold"
-                    style={{ color: healthColor(scoring.healthScore) }}
+                    style={{ color: healthConditionColor(scoring.healthClassification) }}
                   >
                     {label(scoring.healthClassification)}
                   </div>
@@ -147,6 +148,15 @@ export default async function StationDetailPage({
                   <div className="mt-1 text-[13px] font-medium text-text-primary">{scoring.predictionWindow}</div>
                 </div>
               </div>
+              {scoring.riskEscalated && (
+                <p
+                  className="mt-4 border-t border-[var(--border-hairline)] pt-3 text-[12.5px] font-medium leading-relaxed"
+                  style={{ color: "var(--status-critical)" }}
+                >
+                  Escalated from {scoring.baseRiskScore}% ({label(scoring.baseRiskCategoryRaw)}) to{" "}
+                  {scoring.riskScore}% ({label(scoring.riskCategoryRaw)}) — {scoring.upliftReasons.join(", ")}.
+                </p>
+              )}
             </Panel>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -185,12 +195,22 @@ export default async function StationDetailPage({
               </Panel>
 
               <Panel title="AI Insight" action={<Sparkles size={16} className="text-[var(--series-1)]" />}>
-                <p className="text-[13px] font-medium leading-relaxed text-text-primary">{scoring.likelyIssue}</p>
+                <p
+                  className="text-[13px] font-medium leading-relaxed"
+                  style={{ color: riskWarningColor(scoring.riskCategoryRaw) }}
+                >
+                  {scoring.likelyIssue}
+                </p>
                 <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary">{scoring.riskNote}</p>
                 <dl className="mt-4 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-[12px]">
                   <div className="flex justify-between gap-3">
                     <dt className="text-text-muted">Business impact</dt>
-                    <dd className="font-medium text-text-secondary">{scoring.businessImpact}</dd>
+                    <dd
+                      className="font-medium"
+                      style={{ color: scoring.businessImpact.toUpperCase() === "HIGH" ? "var(--status-critical)" : "var(--text-secondary)" }}
+                    >
+                      {scoring.businessImpact}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-text-muted">SLA</dt>
@@ -201,6 +221,39 @@ export default async function StationDetailPage({
                     <dd className="font-medium text-text-secondary">{scoredLabel}</dd>
                   </div>
                 </dl>
+
+                {/* Non-telemetry findings (GET /stations/{id}'s ai_insights) —
+                    maintenance history, seasonal climate projections, regional
+                    connectivity rollups. Just the headline here — detail and
+                    recommended_action are dropped since the checks below in
+                    Recommended Field Action already cover that ground. */}
+                {scoring.aiInsights.length > 0 && (
+                  <ul className="mt-4 space-y-2.5 border-t border-[var(--border-hairline)] pt-3">
+                    {scoring.aiInsights.map((insight, index) => (
+                      <li key={`${insight.category}-${index}`}>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
+                            {label(insight.category)}
+                          </span>
+                          {insight.contributesUplift && (
+                            <span
+                              className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide"
+                              style={{ backgroundColor: "var(--status-critical-bg)", color: "var(--status-critical)" }}
+                            >
+                              Raised risk
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className="mt-1 text-[12.5px] font-medium leading-relaxed"
+                          style={{ color: insight.contributesUplift ? "var(--status-critical)" : "var(--text-secondary)" }}
+                        >
+                          {insight.headline}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </Panel>
             </div>
           </>

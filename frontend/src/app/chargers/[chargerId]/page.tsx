@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Info, LayoutGrid, Plug, Sparkles, Warehouse } from "lucide-react";
+import { ArrowLeft, BatteryCharging, LayoutGrid, Plug, Sparkles, Warehouse } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Panel } from "@/components/ui/Panel";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
@@ -10,6 +10,7 @@ import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { getChargerDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
+import { riskWarningColor } from "@/lib/riskColor";
 
 function label(value: string): string {
   return value
@@ -48,7 +49,8 @@ export default async function ChargerDetailPage({
     );
   }
 
-  const { charger, station, dockRisk, telemetry } = data;
+  const { charger, scoring, station, telemetry } = data;
+  const scoredLabel = scoring ? formatScoredAt(scoring.scoredAt) : null;
 
   return (
     <PageShell title={`${charger.stationId} · ${charger.chargerId}`} subtitle={`Dock ${charger.dockId}`}>
@@ -128,6 +130,173 @@ export default async function ChargerDetailPage({
           </Panel>
         </div>
 
+        {/* GET /chargers/{charger_uid} — the charger's own real AI score, not
+            derived from the dock it sits on. */}
+        {scoring && (
+          <>
+            <Panel>
+              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
+                <div>
+                  <div className="text-[12px] text-text-muted">Condition</div>
+                  <div className="mt-1 text-[15px] font-semibold" style={{ color: riskWarningColor(scoring.riskCategoryRaw) }}>
+                    {label(scoring.healthClassification)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[12px] text-text-muted">Health Score</div>
+                  <div
+                    className="mt-1 text-[15px] font-semibold tabular-nums"
+                    style={{ color: healthColor(scoring.healthScore) }}
+                  >
+                    {scoring.healthScore}
+                    <span className="text-[12px] font-normal text-text-muted">/100</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[12px] text-text-muted">Anomaly</div>
+                  <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                    {scoring.anomalyScore}
+                    <span className="ml-1 text-[12px] font-normal text-text-muted">{label(scoring.anomalySeverity)}</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[12px] text-text-muted">Predictive Risk</div>
+                  <div className="mt-1">
+                    <RiskPill percent={scoring.riskScore} category={scoring.riskCategoryRaw} showCategory />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[12px] text-text-muted">Priority</div>
+                  <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">{scoring.priority}</div>
+                </div>
+                <div>
+                  <div className="text-[12px] text-text-muted">Prediction Window</div>
+                  <div className="mt-1 text-[13px] font-medium text-text-primary">{scoring.predictionWindow}</div>
+                </div>
+              </div>
+            </Panel>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Panel title="Health Dimensions">
+                {scoring.dimensions.length === 0 ? (
+                  <p className="text-[13px] text-text-muted">No dimension scores reported.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {scoring.dimensions.map((dimension) => (
+                      <li key={dimension.key} className="flex items-center gap-3">
+                        <span className="w-32 flex-none text-[13px] text-text-secondary">{dimension.label}</span>
+                        <div className="flex-1">
+                          <HealthBar score={dimension.score} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
+
+              <Panel title="Detected Signals">
+                {scoring.detectedSignals.length === 0 ? (
+                  <p className="text-[13px] text-text-muted">
+                    No anomaly signals detected against this charger&apos;s baseline.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {scoring.detectedSignals.map((signal) => (
+                      <li key={signal} className="flex items-start gap-2 text-[13px] text-text-secondary">
+                        <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[var(--status-warning)]" />
+                        {signal}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
+
+              <Panel title="AI Insight" action={<Sparkles size={16} className="text-[var(--series-1)]" />}>
+                <p
+                  className="text-[13px] font-medium leading-relaxed"
+                  style={{ color: riskWarningColor(scoring.riskCategoryRaw) }}
+                >
+                  {scoring.likelyIssue}
+                </p>
+                <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary">{scoring.riskNote}</p>
+                <dl className="mt-4 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-[12px]">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-text-muted">Business impact</dt>
+                    <dd
+                      className="font-medium"
+                      style={{ color: scoring.businessImpact.toUpperCase() === "HIGH" ? "var(--status-critical)" : "var(--text-secondary)" }}
+                    >
+                      {scoring.businessImpact}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-text-muted">SLA</dt>
+                    <dd className="text-right font-medium text-text-secondary">{scoring.sla}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-text-muted">Scored at</dt>
+                    <dd className="font-medium text-text-secondary">{scoredLabel}</dd>
+                  </div>
+                </dl>
+              </Panel>
+            </div>
+
+            {scoring.currentBattery && (
+              <Panel
+                title="Current Battery"
+                titleNote="(charging at this dock right now)"
+                action={
+                  <Link
+                    href={`/batteries/${scoring.currentBattery.batteryId}`}
+                    className="text-[12px] font-medium text-[var(--series-1)] hover:underline"
+                  >
+                    Open battery →
+                  </Link>
+                }
+              >
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <div>
+                    <div className="text-[12px] text-text-muted">Battery</div>
+                    <Link
+                      href={`/batteries/${scoring.currentBattery.batteryId}`}
+                      className="mt-1 block text-[15px] font-semibold text-[var(--series-1)] hover:underline"
+                    >
+                      {scoring.currentBattery.batteryId}
+                    </Link>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
+                      <BatteryCharging size={13} className="flex-none" />
+                      Charging Status
+                    </div>
+                    <div className="mt-1 text-[15px] font-semibold text-text-primary">
+                      {scoring.currentBattery.chargerStatus ? label(scoring.currentBattery.chargerStatus) : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Charge Level</div>
+                    <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                      {scoring.currentBattery.chargingSocPercent !== null
+                        ? `${Math.round(scoring.currentBattery.chargingSocPercent)}%`
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Battery Health</div>
+                    <div className="mt-1">
+                      {scoring.currentBattery.healthScore !== null ? (
+                        <HealthBar score={scoring.currentBattery.healthScore} />
+                      ) : (
+                        <span className="text-[13px] text-text-muted">—</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            )}
+          </>
+        )}
+
         {station && (
           <Panel title="Parent Station" action={
             <Link href={`/stations/${station.stationId}`} className="text-[12px] font-medium text-[var(--series-1)] hover:underline">
@@ -159,96 +328,6 @@ export default async function ChargerDetailPage({
           </Panel>
         )}
 
-        {/* There is no per-charger scoring endpoint on this platform — a
-            charger's own health/risk comes from the dock it sits on, cross-
-            referenced via GET /assets (see deriveDockAssetId in resources.ts).
-            When that lookup doesn't resolve, this says so instead of hiding
-            the gap or inventing a score. */}
-        {dockRisk ? (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Panel>
-              <div className="text-[12px] text-text-muted">Dock Health ({dockRisk.assetId})</div>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="text-[15px] font-semibold tabular-nums" style={{ color: healthColor(dockRisk.healthScore) }}>
-                  {dockRisk.healthScore}/100
-                </span>
-                <span className="text-[12px] text-text-muted">{label(dockRisk.healthClassification)}</span>
-              </div>
-              <div className="mt-4 text-[12px] text-text-muted">Anomaly</div>
-              <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
-                {dockRisk.anomalyScore}
-                <span className="ml-1 text-[12px] font-normal text-text-muted">{label(dockRisk.anomalySeverity)}</span>
-              </div>
-            </Panel>
-
-            <Panel>
-              <div className="text-[12px] text-text-muted">Predictive Risk</div>
-              <div className="mt-1">
-                <RiskPill percent={dockRisk.riskScore} category={dockRisk.riskCategory} showCategory />
-              </div>
-              <div className="mt-4 text-[12px] text-text-muted">Priority</div>
-              <div className="mt-1 text-[15px] font-semibold text-text-primary">{dockRisk.priority}</div>
-              <div className="mt-4 text-[12px] text-text-muted">Prediction Window</div>
-              <div className="mt-1 text-[13px] font-medium text-text-primary">{dockRisk.predictionWindow}</div>
-            </Panel>
-
-            <Panel title="AI Insight" action={<Sparkles size={16} className="text-[var(--series-1)]" />}>
-              <p className="text-[13px] font-medium leading-relaxed text-text-primary">{dockRisk.likelyIssue}</p>
-              <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted">
-                Scored at the dock this charger sits on ({dockRisk.assetId}) — this platform has no separate
-                per-charger scoring engine.
-              </p>
-              <dl className="mt-4 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-[12px]">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-text-muted">Business impact</dt>
-                  <dd className="font-medium text-text-secondary">{dockRisk.businessImpact ?? "Not available"}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-text-muted">SLA</dt>
-                  <dd className="text-right font-medium text-text-secondary">
-                    Not available
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-text-muted">Scored at</dt>
-                  <dd className="font-medium text-text-secondary">
-                    {dockRisk.scoredAt ? formatScoredAt(dockRisk.scoredAt) : "Not available"}
-                  </dd>
-                </div>
-              </dl>
-            </Panel>
-          </div>
-        ) : (
-          <Panel>
-            <div className="flex items-start gap-2.5 text-[13px] text-text-secondary">
-              <Info size={16} className="mt-0.5 flex-none text-[var(--series-1)]" />
-              <span>
-                <span className="font-semibold text-text-primary">No predictive risk data for this charger.</span>{" "}
-                This platform scores docks, not chargers directly, and this charger&apos;s dock could not be
-                cross-referenced in the dock register.
-              </span>
-            </div>
-          </Panel>
-        )}
-
-        {dockRisk && (
-          <Panel title="Recommended Field Action">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-[13px] text-text-secondary">
-                  <span className="font-semibold text-text-primary">{dockRisk.priority}</span> ·{" "}
-                  {dockRisk.likelyIssue}
-                </p>
-                <p className="mt-2 text-[12px] text-text-muted">
-                  This platform doesn&apos;t provide a per-dock/charger checklist — inspect this charger and
-                  its dock for signs of the likely issue above.
-                </p>
-              </div>
-              <CreateFieldActionButton batteryId={charger.chargerId} sla="Not available" priority={dockRisk.priority} />
-            </div>
-          </Panel>
-        )}
-
         {telemetry.length > 0 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Charger Temperature" titleNote="(daily avg, °C)">
@@ -260,6 +339,28 @@ export default async function ChargerDetailPage({
           </div>
         )}
 
+        {scoring && (
+          <Panel title="Recommended Field Action">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-[13px] text-text-secondary">
+                  <span className="font-semibold text-text-primary">{scoring.priority}</span> · {scoring.sla} ·{" "}
+                  {scoring.likelyIssue}
+                </p>
+                {scoring.suggestedChecks.length > 0 ? (
+                  <ol className="mt-3 ml-4 list-decimal space-y-1 text-[13px] text-text-secondary">
+                    {scoring.suggestedChecks.map((check) => (
+                      <li key={check}>{check}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-2 text-[13px] text-text-muted">No checks suggested.</p>
+                )}
+              </div>
+              <CreateFieldActionButton batteryId={charger.chargerId} sla={scoring.sla} priority={scoring.priority} />
+            </div>
+          </Panel>
+        )}
       </div>
     </PageShell>
   );

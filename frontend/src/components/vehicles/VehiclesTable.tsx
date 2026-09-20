@@ -4,10 +4,8 @@ import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { RiskPill } from "@/components/ui/RiskPill";
-import type { DummyVehicleRow } from "@/lib/dummy/vehicles";
+import type { VehicleRow } from "@/lib/api/normalise";
 
-// Same column set as Batteries/Stations/Chargers — Condition/Health Score/
-// Anomaly/Risk/Priority/Likely Issue. Demo data — see lib/dummy/vehicles.ts.
 const CLASSIFICATION_TONE: Record<string, string> = {
   HEALTHY: "var(--status-good)",
   WATCH: "var(--status-warning)",
@@ -15,7 +13,8 @@ const CLASSIFICATION_TONE: Record<string, string> = {
   CRITICAL: "var(--status-critical)",
 };
 
-function classificationLabel(value: string): string {
+function classificationLabel(value: string | null): string {
+  if (!value) return "—";
   return value
     .replace(/[_-]+/g, " ")
     .toLowerCase()
@@ -28,37 +27,58 @@ const BAND_MEMBERS: Record<string, string[]> = {
   CRITICAL: ["CRITICAL"],
 };
 
-function bandOf(classification: string): string | null {
+function bandOf(classification: string | null): string | null {
+  if (!classification) return null;
   const value = classification.toUpperCase();
   const entry = Object.entries(BAND_MEMBERS).find(([, members]) => members.includes(value));
   return entry ? entry[0] : null;
 }
 
-export function VehiclesTable({ rows }: { rows: DummyVehicleRow[] }) {
-  const columns: Column<DummyVehicleRow>[] = [
+/**
+ * The vehicle register — each row's own registration number ("KA01AA1000",
+ * the vehicle's actual number-plate code) is shown alongside the internal
+ * asset id, since that's what a field team recognises the vehicle by.
+ */
+export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
+  const columns: Column<VehicleRow>[] = [
     {
-      key: "vehicleId",
-      header: "Vehicle ID",
-      headerClassName: "w-[11%]",
-      sortValue: (r) => r.vehicleId,
+      key: "assetId",
+      header: "Vehicle",
+      sortValue: (r) => r.assetId,
       render: (r) => (
-        <Link
-          href={`/vehicles/${r.vehicleId}`}
-          className="font-medium text-[var(--series-1)] hover:underline"
-        >
-          {r.vehicleId}
+        <Link href={`/vehicles/${r.assetId}`} className="font-medium text-[var(--series-1)] hover:underline">
+          {r.assetId}
         </Link>
       ),
     },
     {
+      key: "registrationNumber",
+      header: "Vehicle Code",
+      sortValue: (r) => r.registrationNumber ?? "",
+      render: (r) => (
+        <span className="font-mono text-[12.5px] font-medium tracking-wide text-text-primary">
+          {r.registrationNumber ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "homeStation",
+      header: "Home Station",
+      sortValue: (r) => r.homeStationId ?? "",
+      render: (r) => r.homeStationId ?? "—",
+    },
+    {
       key: "classification",
       header: "Condition",
-      headerClassName: "w-[11%]",
-      sortValue: (r) => r.healthClassification,
+      sortValue: (r) => r.healthClassification ?? "",
       render: (r) => (
         <span
           className="font-medium"
-          style={{ color: CLASSIFICATION_TONE[r.healthClassification.toUpperCase()] ?? "var(--text-secondary)" }}
+          style={{
+            color: r.healthClassification
+              ? (CLASSIFICATION_TONE[r.healthClassification.toUpperCase()] ?? "var(--text-secondary)")
+              : "var(--text-muted)",
+          }}
         >
           {classificationLabel(r.healthClassification)}
         </span>
@@ -67,44 +87,33 @@ export function VehiclesTable({ rows }: { rows: DummyVehicleRow[] }) {
     {
       key: "health",
       header: "Health Score",
-      headerClassName: "w-[15%]",
-      sortValue: (r) => r.healthScore,
-      render: (r) => <HealthBar score={r.healthScore} />,
-    },
-    {
-      key: "anomaly",
-      header: "Anomaly",
-      align: "right",
-      headerClassName: "w-[9%]",
-      sortValue: (r) => r.anomalyScore,
-      render: (r) => (
-        <span className="tabular-nums" title={r.anomalySeverity}>
-          {Math.round(r.anomalyScore)}
-        </span>
-      ),
+      sortValue: (r) => r.healthScore ?? 0,
+      render: (r) => (r.healthScore != null ? <HealthBar score={r.healthScore} /> : <span className="text-text-muted">—</span>),
     },
     {
       key: "risk",
       header: "Risk",
-      headerClassName: "w-[11%]",
-      sortValue: (r) => r.riskScore,
-      render: (r) => <RiskPill percent={r.riskScore} category={r.riskCategoryRaw} />,
+      sortValue: (r) => r.riskScore ?? 0,
+      render: (r) =>
+        r.riskScore != null ? (
+          <RiskPill percent={r.riskScore} category={r.riskCategoryRaw ?? "LOW"} />
+        ) : (
+          <span className="text-text-muted">—</span>
+        ),
     },
     {
       key: "priority",
       header: "Priority",
-      headerClassName: "w-[9%]",
-      sortValue: (r) => r.priority,
-      render: (r) => <span className="tabular-nums text-text-secondary">{r.priority}</span>,
+      sortValue: (r) => r.priority ?? "",
+      render: (r) => <span className="tabular-nums text-text-secondary">{r.priority ?? "—"}</span>,
     },
     {
       key: "issue",
       header: "Likely Issue",
-      headerClassName: "w-[34%]",
-      sortValue: (r) => r.likelyIssue,
+      sortValue: (r) => r.likelyIssue ?? "",
       render: (r) => (
-        <span className="block max-w-[280px] truncate" title={r.likelyIssue}>
-          {r.likelyIssue}
+        <span className="block max-w-[280px] truncate" title={r.likelyIssue ?? undefined}>
+          {r.likelyIssue ?? "—"}
         </span>
       ),
     },
@@ -116,10 +125,17 @@ export function VehiclesTable({ rows }: { rows: DummyVehicleRow[] }) {
     <DataTable
       rows={rows}
       columns={columns}
-      rowKey={(r) => r.vehicleId}
-      rowHref={(r) => `/vehicles/${r.vehicleId}`}
-      searchFields={(r) => [r.vehicleId, r.registration, r.model, r.likelyIssue, r.riskCategoryRaw, r.priority]}
-      searchPlaceholder="Search vehicle, model or issue…"
+      rowKey={(r) => r.assetId}
+      rowHref={(r) => `/vehicles/${r.assetId}`}
+      searchFields={(r) => [
+        r.assetId,
+        r.registrationNumber ?? "",
+        r.homeStationId ?? "",
+        r.likelyIssue ?? "",
+        r.riskCategoryRaw ?? "",
+        r.priority ?? "",
+      ]}
+      searchPlaceholder="Search vehicle, code, station or issue…"
       filters={{
         options: [
           { value: "HEALTHY", label: "Healthy", count: countOf("HEALTHY") },

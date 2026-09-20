@@ -8,6 +8,7 @@ import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { getBatteryDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
+import { riskWarningColor } from "@/lib/riskColor";
 
 const CLASSIFICATION_TONE: Record<string, string> = {
   HEALTHY: "var(--status-good)",
@@ -145,14 +146,22 @@ export default async function BatteryDetailPage({
           </Panel>
 
           <Panel title="AI Insight" action={<Sparkles size={16} className="text-[var(--series-1)]" />}>
-            <p className="text-[13px] font-medium leading-relaxed text-text-primary">
+            <p
+              className="text-[13px] font-medium leading-relaxed"
+              style={{ color: riskWarningColor(battery.riskCategoryRaw) }}
+            >
               {battery.likelyIssue}
             </p>
             <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary">{battery.riskNote}</p>
             <dl className="mt-4 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-[12px]">
               <div className="flex justify-between gap-3">
                 <dt className="text-text-muted">Business impact</dt>
-                <dd className="font-medium text-text-secondary">{battery.businessImpact}</dd>
+                <dd
+                  className="font-medium"
+                  style={{ color: battery.businessImpact.toUpperCase() === "HIGH" ? "var(--status-critical)" : "var(--text-secondary)" }}
+                >
+                  {battery.businessImpact}
+                </dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-text-muted">SLA</dt>

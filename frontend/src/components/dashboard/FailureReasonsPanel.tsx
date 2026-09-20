@@ -1,68 +1,46 @@
-import { Plug, RadioTower, Thermometer, Warehouse } from "lucide-react";
-import { rollUpToScenarios, type ScenarioCode } from "@/lib/api/scenarios";
-
-/** One icon per scenario from section 6 of the requirements. */
-const SCENARIO_STYLE: Record<ScenarioCode, { icon: typeof Plug; color: string }> = {
-  cooling: { icon: Thermometer, color: "var(--status-critical)" },
-  charging: { icon: Plug, color: "var(--status-warning)" },
-  connectivity: { icon: RadioTower, color: "var(--series-1)" },
-  station_performance: { icon: Warehouse, color: "var(--series-7)" },
-};
+// Same 8-color series palette the charts use, so each reason gets a distinct,
+// theme-aware color without inventing a second palette.
+const ROW_COLORS = [
+  "var(--series-2)",
+  "var(--series-1)",
+  "var(--series-7)",
+  "var(--series-2)",
+  "var(--series-1)",
+  "var(--series-3)",
+  "var(--series-4)",
+  "var(--series-5)",
+];
 
 /**
- * Shows the four Failure Scenario Engine scenarios rather than the platform's
- * raw signal names, so the panel speaks the language of the requirements. Each
- * row's tooltip lists the underlying signals it was rolled up from.
+ * Shows GET /dashboard/command-center's `top_failure_reasons` exactly as the
+ * platform reports it — the raw signal name, count and percent, unmodified.
  */
 export function FailureReasonsPanel({
   reasons,
 }: {
   reasons: { reason: string; count: number; pct: number }[];
 }) {
-  const scenarios = rollUpToScenarios(reasons);
-  const anySignal = scenarios.some((s) => s.count > 0);
-
-  if (!anySignal) {
+  if (reasons.length === 0) {
     return <p className="text-[13px] text-text-muted">No failure signals reported.</p>;
   }
 
   return (
     <ul className="-my-0.5 divide-y divide-[var(--border-hairline)]">
-      {scenarios.map((scenario) => {
-        const style = SCENARIO_STYLE[scenario.code];
-        const Icon = style.icon;
-        const muted = scenario.count === 0;
-        return (
-          <li
-            key={scenario.code}
-            className="flex items-center gap-2.5 py-2"
-            title={
-              scenario.signals.length > 0
-                ? `${scenario.count} signals · ${scenario.signals.join(", ")}`
-                : "No signals currently attributed to this scenario"
-            }
+      {reasons.map((r, i) => (
+        <li key={r.reason} className="flex items-center justify-between gap-3 py-2.5">
+          <span
+            className="min-w-0 flex-1 truncate text-[13px] font-medium"
+            style={{ color: ROW_COLORS[i % ROW_COLORS.length] }}
+            title={r.reason}
           >
-            <Icon
-              size={18}
-              style={{ color: muted ? "var(--text-muted)" : style.color }}
-              className="flex-none"
-            />
-            <span className="min-w-0 flex-1">
-              <span
-                className={`block truncate text-[13px] ${muted ? "text-text-muted" : "text-text-secondary"}`}
-              >
-                {scenario.label}
-              </span>
-            </span>
-            <span
-              className="flex-none text-[13px] font-semibold tabular-nums"
-              style={{ color: muted ? "var(--text-muted)" : style.color }}
-            >
-              {Math.round(scenario.pct)}%
-            </span>
-          </li>
-        );
-      })}
+            {r.reason}
+          </span>
+          <span className="flex-none tabular-nums text-[12px] text-text-muted">{r.count.toLocaleString()}</span>
+          <span className="flex-none w-11 text-right text-[13px] font-semibold tabular-nums text-text-primary">
+            {r.pct.toFixed(1)}%
+          </span>
+        </li>
+      ))}
     </ul>
   );
 }

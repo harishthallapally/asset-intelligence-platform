@@ -32,7 +32,7 @@ export function Sidebar({ alertCount }: { alertCount: number }) {
     { href: "/stations", label: "Stations", icon: Warehouse },
     { href: "/chargers", label: "Chargers", icon: Plug },
     { href: "/batteries", label: "Batteries", icon: BatteryCharging },
-    { href: "/vehicles", label: "Vehicles (2W)", icon: Bike },
+    { href: "/vehicles", label: "Vehicles", icon: Bike },
     { href: "/ai-predictions", label: "AI Predictions", icon: Sparkles },
     { href: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
     { href: "/map-view", label: "Map View", icon: Map },
@@ -46,7 +46,7 @@ export function Sidebar({ alertCount }: { alertCount: number }) {
           alt="Circumcircle Innovations"
           width={312}
           height={107}
-          className="h-9 w-auto"
+          className="h-auto w-full"
           priority
         />
       </Link>

@@ -38,8 +38,9 @@ export default async function ChargersPage({
             <ChargersTable rows={data} />
           </Panel>
           <p className="px-1 text-[11.5px] text-text-muted">
-            Condition, Health Score, Anomaly, Risk, Priority and Likely Issue are scored on the dock each
-            charger sits on — this platform has no separate per-charger scoring engine.
+            Condition, Health Score, Anomaly, Risk, Priority and Likely Issue are each charger&apos;s own real
+            score (GET /chargers/scores) — open a charger for its full dimensions, signals and recommended
+            action.
           </p>
         </div>
       )}

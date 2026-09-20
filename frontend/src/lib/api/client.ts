@@ -22,10 +22,15 @@ import type {
   ApiOperationsRiskItem,
   ApiPredictiveWarning,
   ApiRiskSummary,
+  ApiChargerDetail,
+  ApiChargerScore,
   ApiStation,
   ApiStationDetail,
   ApiStationScore,
   ApiStationSummary,
+  ApiVehicleDetail,
+  ApiVehicleFleetSummary,
+  ApiVehicleSummary,
 } from "./types";
 
 // The service is deployed on a platform that cold-starts, so first requests can
@@ -60,10 +65,7 @@ export class ApiUnavailableError extends Error {
   }
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const base = apiBaseUrl();
-  if (!base) throw new ApiUnavailableError("The monitoring service address is not configured");
-
+async function requestJson<T>(base: string, path: string): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -86,6 +88,12 @@ async function getJson<T>(path: string): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  const base = apiBaseUrl();
+  if (!base) throw new ApiUnavailableError("The monitoring service address is not configured");
+  return requestJson<T>(base, path);
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
@@ -174,6 +182,29 @@ export const fetchChargers = cache(
     getJson<ApiCharger[]>(ENDPOINTS.chargers()),
 );
 
+/** The charger's own real AI score (health/anomaly/risk), one call for the
+ * whole fleet — see ApiChargerScore. */
+export const fetchChargerScores = cache(
+  (): Promise<ApiChargerScore[]> => getJson<ApiChargerScore[]>(ENDPOINTS.chargersScores()),
+);
+
+/** The charger's own "Asset 360" — see ApiChargerDetail. */
+export const fetchChargerDetail = cache(
+  (chargerUid: string): Promise<ApiChargerDetail> => getJson<ApiChargerDetail>(ENDPOINTS.chargerDetail(chargerUid)),
+);
+
+export const fetchVehicles = cache(
+  (): Promise<ApiVehicleSummary[]> => getJson<ApiVehicleSummary[]>(ENDPOINTS.vehicles()),
+);
+
+export const fetchVehicleSummary = cache(
+  (): Promise<ApiVehicleFleetSummary> => getJson<ApiVehicleFleetSummary>(ENDPOINTS.vehicleSummary()),
+);
+
+export const fetchVehicle = cache(
+  (assetId: string): Promise<ApiVehicleDetail> => getJson<ApiVehicleDetail>(ENDPOINTS.vehicle(assetId)),
+);
+
 export const fetchHealthDistribution = cache(
   (): Promise<ApiHealthDistribution> =>
     getJson<ApiHealthDistribution>(ENDPOINTS.operationsHealthDistribution()),
@@ -207,11 +238,21 @@ export const fetchAssetTelemetry = cache(
     getJson<ApiAssetTelemetryPoint[]>(ENDPOINTS.assetTelemetry(assetId, days)),
 );
 
-/** Dock/charger risk list — carries `business_impact` and `scored_at`, which
- * GET /operations/predictive-warnings and GET /assets don't. */
+/** Cross-asset-type risk list (stations, chargers, docks, batteries) —
+ * carries `business_impact`, which GET /operations/predictive-warnings and
+ * GET /assets don't. Defaults to the API's own defaults (limit 10, balanced
+ * mix) — pass `assetType` + a large `limit` for the full single-type list
+ * (see ENDPOINTS.operationsRisk). */
 export const fetchOperationsRisk = cache(
-  (sortBy = "risk", order: "asc" | "desc" = "desc"): Promise<ApiOperationsRiskItem[]> =>
-    getJson<ApiOperationsRiskItem[]>(ENDPOINTS.operationsRisk(sortBy, order)),
+  (
+    p: {
+      sortBy?: string;
+      order?: "asc" | "desc";
+      limit?: number;
+      assetType?: string;
+      mix?: "balanced" | "strict";
+    } = {},
+  ): Promise<ApiOperationsRiskItem[]> => getJson<ApiOperationsRiskItem[]>(ENDPOINTS.operationsRisk(p)),
 );
 
 // --- Demo controls -------------------------------------------------------

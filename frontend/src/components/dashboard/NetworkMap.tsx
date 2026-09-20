@@ -15,7 +15,10 @@ export interface MapMarker {
   lat: number;
   lng: number;
   online: boolean;
-  atRisk: number;
+  /** The station's own real predictive risk (GET /stations/scores) — null
+   * only if that score didn't merge in. */
+  riskScore: number | null;
+  riskCategory: string | null;
   avgHealthScore: number;
 }
 
@@ -42,15 +45,15 @@ const LABEL_STYLE: Record<"above" | "left" | "right", React.CSSProperties> = {
 
 function markerColor(marker: MapMarker): string {
   if (!marker.online) return "var(--text-muted)";
-  if (marker.atRisk >= 3) return "var(--status-critical)";
-  if (marker.atRisk >= 1) return "var(--status-warning)";
+  if (marker.riskCategory === "CRITICAL" || marker.riskCategory === "HIGH") return "var(--status-critical)";
+  if (marker.riskCategory === "MODERATE") return "var(--status-warning)";
   return "var(--status-good)";
 }
 
 export const MAP_LEGEND = [
-  { label: "Healthy", color: "var(--status-good)" },
-  { label: "1-2 at-risk docks", color: "var(--status-warning)" },
-  { label: "3+ at-risk docks", color: "var(--status-critical)" },
+  { label: "Low risk", color: "var(--status-good)" },
+  { label: "Moderate risk", color: "var(--status-warning)" },
+  { label: "High / critical risk", color: "var(--status-critical)" },
   { label: "Station offline", color: "var(--text-muted)" },
 ];
 
@@ -83,7 +86,13 @@ export function NetworkMap({ stations, cityLabels }: { stations: MapMarker[]; ci
           <Link
             key={marker.stationId}
             href={`/stations/${marker.stationId}`}
-            title={`${marker.stationId} · ${marker.label} · ${!marker.online ? "Offline" : `${marker.atRisk} at-risk dock(s)`} · avg health ${marker.avgHealthScore}`}
+            title={`${marker.stationId} · ${marker.label} · ${
+              !marker.online
+                ? "Offline"
+                : marker.riskScore !== null
+                  ? `${Math.round(marker.riskScore)}% risk (${marker.riskCategory})`
+                  : "Risk not available"
+            } · avg health ${marker.avgHealthScore}`}
             className="absolute -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${x}%`, top: `${y}%` }}
           >

@@ -64,7 +64,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 alt="Circumcircle Innovations"
                 width={312}
                 height={107}
-                className="h-7 w-auto max-w-[160px]"
+                className="h-14 w-auto max-w-[320px]"
               />
             </div>
           </footer>

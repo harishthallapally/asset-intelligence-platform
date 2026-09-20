@@ -13,7 +13,9 @@ import {
   fetchBattery,
   fetchBatterySummary,
   fetchAssets,
+  fetchChargerDetail,
   fetchChargers,
+  fetchChargerScores,
   fetchCommandCenter,
   fetchDemoDatasets,
   fetchDemoScenarios,
@@ -24,11 +26,14 @@ import {
   fetchStations,
   fetchStationScores,
   fetchStationsSummary,
+  fetchVehicle,
+  fetchVehicles,
+  fetchVehicleSummary,
 } from "./client";
-import type { ApiBatteryCounts } from "./types";
+import type { ApiBatteryCounts, ApiVehicleFleetSummary } from "./types";
 import {
   aggregateStationTelemetry,
-  mergeChargerDockRisk,
+  mergeChargerScore,
   mergeStationScore,
   normaliseAlert,
   normaliseAsset,
@@ -36,19 +41,27 @@ import {
   normaliseBattery,
   normaliseBatteryDetail,
   normaliseCharger,
+  normaliseChargerDetail,
+  normaliseOperationsRisk,
   normalisePredictiveWarning,
   normaliseStation,
   normaliseStationDetail,
+  normaliseVehicle,
+  normaliseVehicleDetail,
   type AssetRow,
   type AssetTelemetryPointView,
   type BatteryDetailView,
   type BatteryRow,
   type AlertTone,
+  type ChargerDetailView,
   type ChargerRow,
   type DashboardAlert,
+  type OperationsRiskRow,
   type PredictiveWarningRow,
   type StationDetailView,
   type StationRow,
+  type VehicleDetailView,
+  type VehicleRow,
 } from "./normalise";
 
 export interface Loaded<T> {
@@ -92,6 +105,57 @@ export function getBatteriesPage(): Promise<Loaded<BatteriesPageData>> {
 
 export function getBatteryDetail(batteryId: string): Promise<Loaded<BatteryDetailView>> {
   return load(async () => normaliseBatteryDetail(await fetchBattery(batteryId)));
+}
+
+export interface VehiclesPageData {
+  rows: VehicleRow[];
+  summary: ApiVehicleFleetSummary | null;
+}
+
+export function getVehiclesPage(): Promise<Loaded<VehiclesPageData>> {
+  return load(async () => {
+    const [rows, summary] = await Promise.all([
+      fetchVehicles(),
+      fetchVehicleSummary().catch(() => null),
+    ]);
+    return { rows: rows.map(normaliseVehicle), summary };
+  });
+}
+
+export function getVehicleDetail(assetId: string): Promise<Loaded<VehicleDetailView>> {
+  return load(async () => normaliseVehicleDetail(await fetchVehicle(assetId)));
+}
+
+/** GET /operations/risk, every dock fleet-wide — carrying a location string
+ * and business_impact the per-type score endpoints don't. Used by the Map
+ * View to group risk by location. The endpoint's own default (no filter) is
+ * a small cross-type "balanced" sample, not the full dock list, so this
+ * always passes assetType/limit explicitly — see getTopRiskAssets for the
+ * cross-type version. Never throws — an empty list just means the Map
+ * View's hotspots quietly show nothing. */
+export async function getOperationsRiskRows(): Promise<OperationsRiskRow[]> {
+  try {
+    return (await fetchOperationsRisk({ assetType: "DOCK", limit: 500 })).map(normaliseOperationsRisk);
+  } catch {
+    return [];
+  }
+}
+
+/** GET /operations/risk's own cross-asset-type ranking (stations, chargers,
+ * docks, batteries together) — "balanced" (the API's default) round-robins
+ * the worst of each type so a top-N list isn't all-batteries (the fleet has
+ * 3,124 of those against 26 stations). This is the platform's own answer to
+ * "what needs attention right now", not a client-side recombination of
+ * separately-fetched per-type lists. Never throws — an empty list just
+ * means the Top Risk Assets panel shows nothing. */
+export async function getTopRiskAssets(limit = 10): Promise<OperationsRiskRow[]> {
+  try {
+    return (await fetchOperationsRisk({ sortBy: "risk", order: "desc", limit, mix: "balanced" })).map(
+      normaliseOperationsRisk,
+    );
+  } catch {
+    return [];
+  }
 }
 
 export interface StationsPageData {
@@ -175,42 +239,24 @@ export function getStationDetail(stationId: string): Promise<Loaded<StationDetai
 
 export function getChargersPage(): Promise<Loaded<ChargerRow[]>> {
   return load(async () => {
-    // There is no per-charger scoring endpoint — GET /assets (the dock
-    // register) is cross-referenced per charger via `deriveDockAssetId`, a
-    // second independent call so its failure doesn't blank the charger list.
-    const [chargers, assets] = await Promise.all([fetchChargers(), fetchAssets().catch(() => [])]);
-    const assetById = new Map(assets.map((a) => [a.asset_id, a]));
+    // GET /chargers/scores is the charger's own real AI score, keyed by the
+    // fleet-unique charger_uid ("<station_id>-<charger_id>") — a second
+    // independent call so its failure doesn't blank the charger list.
+    const [chargers, scores] = await Promise.all([fetchChargers(), fetchChargerScores().catch(() => [])]);
+    const scoreByUid = new Map(scores.map((s) => [s.charger_uid.toLowerCase(), s]));
     return chargers.map((c) => {
       const row = normaliseCharger(c);
-      const dockAssetId = deriveDockAssetId(row.stationId, row.dockId);
-      return dockAssetId ? mergeChargerDockRisk(row, assetById.get(dockAssetId)) : row;
+      return mergeChargerScore(row, scoreByUid.get(`${row.stationId}-${row.chargerId}`.toLowerCase()));
     });
   });
 }
 
-/** There is no per-charger scoring endpoint — a charger's own health/risk
- * comes from the dock it sits on, via GET /assets. The two subsystems name
- * docks differently ("D01" on the charger vs "QIS-001-01" on the asset), so
- * this reconstructs the asset-style id from the charger's own station+dock
- * numbers to look it up. */
-export interface DockRiskView {
-  assetId: string;
-  healthScore: number;
-  healthClassification: string;
-  anomalyScore: number;
-  anomalySeverity: string;
-  riskScore: number;
-  riskCategory: string;
-  priority: string;
-  likelyIssue: string;
-  predictionWindow: string;
-  /** From GET /operations/risk, a second cross-reference — null if that call
-   * fails; the rest of dockRisk still renders without it. No `sla` exists for
-   * a dock/charger anywhere in this platform's API. */
-  businessImpact: string | null;
-  scoredAt: string | null;
-}
-
+/** The dock asset id a charger's telemetry trend comes from — the two
+ * subsystems name docks differently ("D01" on the charger vs "QIS-001-01" on
+ * the asset), so this reconstructs the asset-style id from the charger's own
+ * station+dock numbers. Telemetry history only exists per-dock (GET
+ * /assets/{id}/telemetry) — the charger's own detail endpoint has no
+ * historical trend, only current scores. */
 function deriveDockAssetId(stationId: string, dockId: string): string | null {
   const stationDigits = stationId.match(/(\d+)/)?.[1];
   const dockDigits = dockId.match(/(\d+)/)?.[1];
@@ -220,24 +266,23 @@ function deriveDockAssetId(stationId: string, dockId: string): string | null {
 
 export interface ChargerDetailData {
   charger: ChargerRow;
+  /** GET /chargers/{charger_uid} — the charger's own AI-scoring detail
+   * (dimensions, signals, recommended checks, and whichever battery is
+   * currently charging there). Null only if that call itself fails; the
+   * rest of the page still renders from `charger`. */
+  scoring: ChargerDetailView | null;
   station: StationRow | null;
-  /** The dock's own AI scoring, cross-referenced via `deriveDockAssetId` —
-   * null if the derived id has no match (naming assumption didn't hold). */
-  dockRisk: DockRiskView | null;
-  /** Recent daily telemetry for that same dock, when the cross-reference
-   * above resolved. */
+  /** Recent daily telemetry for the dock this charger sits on. */
   telemetry: AssetTelemetryPointView[];
 }
 
 /**
- * There is no GET /chargers/{id} either, so — same approach as station
- * detail — this is assembled from the charger list plus the station list.
- *
  * `charger_id` is NOT unique across the fleet — the service reuses a small
  * pool (CHG01..CHG15, one per dock position) at every station, so "CHG12"
  * alone matches ~26 different chargers. `stationId` disambiguates; every
- * internal link passes it. Without it, the first match is used and the
- * result is unreliable — callers should always supply it when known.
+ * internal link passes it. Without it, the first match is used (and its
+ * station used to build charger_uid) — callers should always supply it when
+ * known.
  */
 export function getChargerDetail(chargerId: string, stationId?: string): Promise<Loaded<ChargerDetailData>> {
   return load(async () => {
@@ -256,42 +301,19 @@ export function getChargerDetail(chargerId: string, stationId?: string): Promise
 
     const charger = normaliseCharger(match);
     const stationMatch = stations.find((s) => s.station_id.toLowerCase() === charger.stationId.toLowerCase());
-
+    const chargerUid = `${charger.stationId}-${charger.chargerId}`;
     const dockAssetId = deriveDockAssetId(charger.stationId, charger.dockId);
-    let dockRisk: DockRiskView | null = null;
-    let telemetry: AssetTelemetryPointView[] = [];
-    if (dockAssetId) {
-      const [assets, riskItems, telemetryPoints] = await Promise.all([
-        fetchAssets().catch(() => []),
-        fetchOperationsRisk().catch(() => []),
-        fetchAssetTelemetry(dockAssetId, 14).catch(() => []),
-      ]);
-      const asset = assets.find((a) => a.asset_id === dockAssetId);
-      const riskItem = riskItems.find((r) => r.asset_id === dockAssetId);
-      if (asset) {
-        dockRisk = {
-          assetId: asset.asset_id,
-          healthScore: asset.health_score,
-          healthClassification: asset.health_classification,
-          anomalyScore: asset.anomaly_score,
-          anomalySeverity: asset.anomaly_severity,
-          riskScore: asset.risk_score,
-          riskCategory: asset.risk_category,
-          priority: asset.priority,
-          likelyIssue: asset.likely_issue,
-          predictionWindow: asset.prediction_window,
-          businessImpact: riskItem?.business_impact ?? null,
-          scoredAt: riskItem?.scored_at ?? null,
-        };
-      }
-      telemetry = normaliseAssetTelemetry(telemetryPoints);
-    }
+
+    const [scoring, telemetryPoints] = await Promise.all([
+      fetchChargerDetail(chargerUid).then(normaliseChargerDetail).catch(() => null),
+      dockAssetId ? fetchAssetTelemetry(dockAssetId, 14).catch(() => []) : Promise.resolve([]),
+    ]);
 
     return {
       charger,
+      scoring,
       station: stationMatch ? normaliseStation(stationMatch) : null,
-      dockRisk,
-      telemetry,
+      telemetry: normaliseAssetTelemetry(telemetryPoints),
     };
   });
 }

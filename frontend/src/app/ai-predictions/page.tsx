@@ -5,12 +5,11 @@ import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { StatCard } from "@/components/ui/StatCard";
 import { PredictiveWarningsTable } from "@/components/predictions/PredictiveWarningsTable";
 import { getPredictiveWarningsPage } from "@/lib/api/resources";
-import { getDummyVehiclePredictiveWarnings } from "@/lib/dummy/vehicles";
 
 export default async function AiPredictionsPage() {
-  const { data: liveRows, error } = await getPredictiveWarningsPage();
+  const { data: rows, error } = await getPredictiveWarningsPage();
 
-  if (error || !liveRows) {
+  if (error || !rows) {
     return (
       <PageShell title="AI Predictions" subtitle="Predictive risk register">
         <ApiErrorState title="Could not load predictive warnings" error={error ?? "Unknown error"} />
@@ -18,18 +17,11 @@ export default async function AiPredictionsPage() {
     );
   }
 
-  // The demo vehicle fleet is appended so Vehicles shows up here like every
-  // other asset type — each row is tagged "Vehicle (Demo)" in the Type
-  // column (see PredictiveWarningsTable) so it's never mistaken for a real
-  // platform score.
-  const vehicleRows = getDummyVehiclePredictiveWarnings();
-  const rows = [...liveRows, ...vehicleRows];
-
   const critical = rows.filter((r) => r.riskCategory === "CRITICAL").length;
   const highRisk = rows.filter((r) => r.riskCategory === "HIGH" || r.riskCategory === "CRITICAL").length;
   const p1 = rows.filter((r) => r.priority === "P1").length;
 
-  const subtitle = `${rows.length.toLocaleString()} predictive warnings across the fleet (incl. ${vehicleRows.length} demo vehicle entries)`;
+  const subtitle = `${rows.length.toLocaleString()} predictive warnings across the fleet`;
 
   return (
     <PageShell title="AI Predictions" subtitle={subtitle}>
@@ -71,10 +63,7 @@ export default async function AiPredictionsPage() {
             <span className="font-semibold text-text-primary">Predictive Risk / Early Warning.</span> These
             scores express the likelihood of an operational issue developing inside the prediction window,
             based on recent telemetry trends — across every asset type the platform scores (batteries,
-            stations, docks and chargers). They are not confirmed failure predictions.{" "}
-            <span className="font-semibold text-text-primary">Vehicle (Demo)</span> rows are the exception —
-            the platform has no vehicle-telemetry service yet, so those scores are fabricated for UI preview
-            only (see the Vehicles page).
+            stations, docks and chargers). They are not confirmed failure predictions.
           </p>
         </div>
       </div>

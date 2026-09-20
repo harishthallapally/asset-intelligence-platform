@@ -1,21 +1,29 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { Panel } from "@/components/ui/Panel";
-import { DemoDataBanner } from "@/components/ui/DemoDataBanner";
+import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { VehiclesTable } from "@/components/vehicles/VehiclesTable";
-import { getDummyVehicles } from "@/lib/dummy/vehicles";
+import { getVehiclesPage } from "@/lib/api/resources";
 
-export default function VehiclesPage() {
-  const rows = getDummyVehicles();
-  const online = rows.filter((r) => r.online).length;
+export default async function VehiclesPage() {
+  const { data, error } = await getVehiclesPage();
+
+  const subtitle = data
+    ? `${data.rows.length.toLocaleString()} vehicles${
+        data.summary?.average_health_score != null
+          ? ` · overall health ${Math.round(data.summary.average_health_score)}/100`
+          : ""
+      }`
+    : "Live vehicle data";
 
   return (
-    <PageShell title="Vehicles (2W)" subtitle={`${rows.length} two-wheelers (2W) · ${online} online — demo data`}>
-      <div className="flex flex-col gap-3">
-        <DemoDataBanner />
+    <PageShell title="Vehicles" subtitle={subtitle}>
+      {error || !data ? (
+        <ApiErrorState title="Could not load the vehicle data" error={error ?? "Unknown error"} />
+      ) : (
         <Panel>
-          <VehiclesTable rows={rows} />
+          <VehiclesTable rows={data.rows} />
         </Panel>
-      </div>
+      )}
     </PageShell>
   );
 }

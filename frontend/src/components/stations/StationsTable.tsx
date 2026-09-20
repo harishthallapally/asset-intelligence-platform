@@ -71,11 +71,14 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
         ),
     },
     {
+      // The station's own AI-scored health (GET /stations' health_score) —
+      // not avgHealthScore, the plain average of its docks, which is a
+      // different, usually higher, number.
       key: "health",
       header: "Health Score",
       headerClassName: "w-[15%]",
-      sortValue: (r) => r.avgHealthScore,
-      render: (r) => <HealthBar score={r.avgHealthScore} />,
+      sortValue: (r) => r.healthScore ?? -1,
+      render: (r) => (r.healthScore !== null ? <HealthBar score={r.healthScore} /> : <span className="text-text-muted">—</span>),
     },
     {
       key: "anomaly",

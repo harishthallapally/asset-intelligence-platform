@@ -16,14 +16,18 @@ import {
   fetchChargers,
   fetchCommandCenter,
   fetchHealthDistribution,
+  fetchOperationsRisk,
   fetchRiskSummary,
   fetchStations,
 } from "./client";
 import { buildDemoCommandCenter } from "./demoSource";
 import {
+  mergeChargerOperationsRisk,
+  mergeStationOperationsRisk,
   normaliseCharger,
   normaliseCommandCenter,
   normaliseDistribution,
+  normaliseOperationsRisk,
   normaliseStation,
   normaliseTrend,
   type ChargerRow,
@@ -59,16 +63,32 @@ export async function getDashboardData(trendDays = 7): Promise<DashboardResult> 
   if (!apiBaseUrl()) return demoResult("API_BASE_URL is not set");
 
   try {
-    const [payload, distribution, riskSummary, trend, stations, chargers] = await Promise.all([
-      fetchCommandCenter(),
-      fetchHealthDistribution().catch(() => null),
-      fetchRiskSummary().catch(() => null),
-      fetchBatteryHealthTrend(trendDays).catch(() => null),
-      fetchStations().catch(() => []),
-      fetchChargers().catch(() => []),
-    ]);
+    const [payload, distribution, riskSummary, trend, stations, chargers, stationRiskItems, chargerRiskItems] =
+      await Promise.all([
+        fetchCommandCenter(),
+        fetchHealthDistribution().catch(() => null),
+        fetchRiskSummary().catch(() => null),
+        fetchBatteryHealthTrend(trendDays).catch(() => null),
+        fetchStations().catch(() => []),
+        fetchChargers().catch(() => []),
+        // Each asset_type filter on GET /operations/risk returns that type's
+        // own native score (identical to /stations/scores and
+        // /chargers/scores) — not a dock proxy, so this screen's numbers
+        // always match what the station/charger's own detail page shows.
+        fetchOperationsRisk({ assetType: "STATION", limit: 100 }).catch(() => []),
+        fetchOperationsRisk({ assetType: "CHARGER", limit: 500 }).catch(() => []),
+      ]);
 
     const data = normaliseCommandCenter(payload, "api");
+    const stationRisk = stationRiskItems.map(normaliseOperationsRisk);
+    const chargerRisk = chargerRiskItems.map(normaliseOperationsRisk);
+
+    // A STATION-type row's own asset_id is the station_id itself.
+    const riskByStationId = new Map(stationRisk.map((r) => [r.assetId.toLowerCase(), r]));
+    // A CHARGER-type row's own asset_id is its charger_uid
+    // ("<station_id>-<charger_id>"), which is exactly how the charger row
+    // below is keyed too.
+    const riskByChargerUid = new Map(chargerRisk.map((r) => [r.assetId.toLowerCase(), r]));
 
     return {
       data: {
@@ -83,9 +103,16 @@ export async function getDashboardData(trendDays = 7): Promise<DashboardResult> 
         },
         riskNotes: { maintenanceDue: riskSummary?.maintenance_due.note ?? null },
         healthTrend: normaliseTrend(trend) ?? data.healthTrend,
+        // failureReasons comes straight from GET /dashboard/command-center's
+        // own top_failure_reasons (set in normaliseCommandCenter) — that is
+        // the platform's canonical "Top Failure Reasons" list for this panel.
       },
-      stations: stations.map(normaliseStation),
-      chargers: chargers.map(normaliseCharger),
+      stations: stations
+        .map(normaliseStation)
+        .map((row) => mergeStationOperationsRisk(row, riskByStationId.get(row.stationId.toLowerCase()))),
+      chargers: chargers
+        .map(normaliseCharger)
+        .map((row) => mergeChargerOperationsRisk(row, riskByChargerUid.get(`${row.stationId}-${row.chargerId}`.toLowerCase()))),
       fallbackReason: null,
     };
   } catch (error) {

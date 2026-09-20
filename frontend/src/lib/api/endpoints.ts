@@ -42,6 +42,14 @@ export const ENDPOINTS = {
   assetEvents: (assetId: string, limit?: number) => `/assets/${id(assetId)}/events${qs({ limit })}`,
   assetTelemetry: (assetId: string, days = 7) => `/assets/${id(assetId)}/telemetry${qs({ days })}`,
 
+  // --- Vehicles (2W EV fleet) ---
+  vehicles: (p: { classification?: string; riskCategory?: string } = {}) =>
+    `/vehicles${qs({ classification: p.classification, risk_category: p.riskCategory })}`,
+  vehicle: (assetId: string) => `/vehicles/${id(assetId)}`,
+  vehicleSummary: () => "/vehicles/summary",
+  vehiclesTopRisk: (sortBy = "risk", order: "asc" | "desc" = "desc") =>
+    `/vehicles/risk/top${qs({ sort_by: sortBy, order })}`,
+
   // --- Stations & chargers ---
   stations: () => "/stations",
   stationsSummary: () => "/stations/summary",
@@ -49,14 +57,31 @@ export const ENDPOINTS = {
   station: (stationId: string) => `/stations/${id(stationId)}`,
   chargers: () => "/chargers",
   chargersSummary: () => "/chargers/summary",
+  // Real per-charger AI score, keyed by the fleet-unique charger_uid — see
+  // ApiChargerScore.
+  chargersScores: () => "/chargers/scores",
+  // The charger's own "Asset 360" — see ApiChargerDetail. chargerUid is
+  // "<station_id>-<charger_id>", e.g. "QIS018-CHG11".
+  chargerDetail: (chargerUid: string) => `/chargers/${id(chargerUid)}`,
 
   // --- Operations ---
   operationsSummary: () => "/operations/summary",
   operationsAlerts: (limit?: number) => `/operations/alerts${qs({ limit })}`,
   operationsPredictiveWarnings: (p: { assetType?: string; minCategory?: string } = {}) =>
     `/operations/predictive-warnings${qs({ asset_type: p.assetType, min_category: p.minCategory })}`,
-  operationsRisk: (sortBy?: string, order?: "asc" | "desc") =>
-    `/operations/risk${qs({ sort_by: sortBy, order })}`,
+  // asset_type filters to one type (STATION|CHARGER|DOCK|BATTERY); mix only
+  // applies to the default risk/desc sort with no asset_type filter —
+  // "balanced" (the API's own default) round-robins the worst of each type
+  // so a top-N list isn't all-batteries, "strict" is the raw global ranking.
+  operationsRisk: (
+    p: {
+      sortBy?: string;
+      order?: "asc" | "desc";
+      limit?: number;
+      assetType?: string;
+      mix?: "balanced" | "strict";
+    } = {},
+  ) => `/operations/risk${qs({ sort_by: p.sortBy, order: p.order, limit: p.limit, asset_type: p.assetType, mix: p.mix })}`,
   operationsRiskSummary: () => "/operations/risk-summary",
   operationsHealthDistribution: () => "/operations/health-distribution",
   operationsFailureReasons: (p: { limit?: number; scope?: string } = {}) =>
