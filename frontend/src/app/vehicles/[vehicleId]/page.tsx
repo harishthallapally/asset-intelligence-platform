@@ -44,15 +44,20 @@ export default async function VehicleDetailPage({
   params: Promise<{ vehicleId: string }>;
 }) {
   const { vehicleId } = await params;
-  const { data: vehicle, error } = await getVehicleDetail(vehicleId);
+  const { data, error } = await getVehicleDetail(vehicleId);
 
-  if (error || !vehicle) {
+  if (error || !data) {
     return (
       <PageShell title={vehicleId} subtitle="Vehicle 360">
-        <ApiErrorState title={`Could not load ${vehicleId}`} error={error ?? "Unknown error"} />
+        <ApiErrorState
+          title={`Could not load ${vehicleId}`}
+          error={error ?? "Unknown error"}
+        />
       </PageShell>
     );
   }
+
+  const vehicle = data;
 
   const scoredLabel = vehicle.scoredAt ? formatScoredAt(vehicle.scoredAt) : "—";
 
@@ -78,7 +83,9 @@ export default async function VehicleDetailPage({
             <div>
               <div className="text-[12px] text-text-muted">Model</div>
               <div className="mt-1 text-[15px] font-semibold text-text-primary">
-                {vehicle.manufacturer ? `${vehicle.manufacturer} ${vehicle.model ?? ""}`.trim() : (vehicle.model ?? "—")}
+                {vehicle.manufacturer
+                  ? `${vehicle.manufacturer} ${vehicle.model ?? ""}`.trim()
+                  : (vehicle.model ?? "—")}
               </div>
             </div>
             <div>
@@ -93,7 +100,9 @@ export default async function VehicleDetailPage({
                 className="mt-1 text-[15px] font-semibold"
                 style={{
                   color: vehicle.healthClassification
-                    ? (CLASSIFICATION_TONE[vehicle.healthClassification.toUpperCase()] ?? "var(--text-primary)")
+                    ? (CLASSIFICATION_TONE[
+                        vehicle.healthClassification.toUpperCase()
+                      ] ?? "var(--text-primary)")
                     : "var(--text-primary)",
                 }}
               >
@@ -108,7 +117,9 @@ export default async function VehicleDetailPage({
                   style={{ color: healthColor(vehicle.healthScore) }}
                 >
                   {vehicle.healthScore}
-                  <span className="text-[12px] font-normal text-text-muted">/100</span>
+                  <span className="text-[12px] font-normal text-text-muted">
+                    /100
+                  </span>
                 </div>
               ) : (
                 <div className="mt-1 text-[15px] text-text-muted">—</div>
@@ -118,7 +129,11 @@ export default async function VehicleDetailPage({
               <div className="text-[12px] text-text-muted">Predictive Risk</div>
               <div className="mt-1">
                 {vehicle.riskScore != null ? (
-                  <RiskPill percent={vehicle.riskScore} category={vehicle.riskCategoryRaw ?? "LOW"} showCategory />
+                  <RiskPill
+                    percent={vehicle.riskScore}
+                    category={vehicle.riskCategoryRaw ?? "LOW"}
+                    showCategory
+                  />
                 ) : (
                   <span className="text-[13px] text-text-muted">—</span>
                 )}
@@ -136,7 +151,9 @@ export default async function VehicleDetailPage({
                   className="mt-1 text-[15px] font-semibold"
                   style={{
                     color: vehicle.batteryWarranty.status
-                      ? (WARRANTY_TONE[vehicle.batteryWarranty.status.toUpperCase()] ?? "var(--text-primary)")
+                      ? (WARRANTY_TONE[
+                          vehicle.batteryWarranty.status.toUpperCase()
+                        ] ?? "var(--text-primary)")
                       : "var(--text-primary)",
                   }}
                 >
@@ -144,19 +161,25 @@ export default async function VehicleDetailPage({
                 </div>
               </div>
               <div>
-                <div className="text-[12px] text-text-muted">Limiting Factor</div>
+                <div className="text-[12px] text-text-muted">
+                  Limiting Factor
+                </div>
                 <div className="mt-1 text-[15px] font-semibold text-text-primary">
                   {label(vehicle.batteryWarranty.limitingFactor)}
                 </div>
               </div>
               <div>
-                <div className="text-[12px] text-text-muted">Days Remaining</div>
+                <div className="text-[12px] text-text-muted">
+                  Days Remaining
+                </div>
                 <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
                   {vehicle.batteryWarranty.daysRemaining ?? "—"}
                 </div>
               </div>
               <div>
-                <div className="text-[12px] text-text-muted">Distance Remaining</div>
+                <div className="text-[12px] text-text-muted">
+                  Distance Remaining
+                </div>
                 <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
                   {vehicle.batteryWarranty.distanceRemainingKm != null
                     ? `${vehicle.batteryWarranty.distanceRemainingKm.toLocaleString("en-IN")} km`
@@ -174,7 +197,8 @@ export default async function VehicleDetailPage({
               <div>
                 <div className="text-[12px] text-text-muted">Coverage</div>
                 <div className="mt-1 text-[13px] font-medium text-text-primary">
-                  {formatDate(vehicle.batteryWarranty.start)} – {formatDate(vehicle.batteryWarranty.end)}
+                  {formatDate(vehicle.batteryWarranty.start)} –{" "}
+                  {formatDate(vehicle.batteryWarranty.end)}
                 </div>
               </div>
             </div>
@@ -184,12 +208,16 @@ export default async function VehicleDetailPage({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Panel title="Health Dimensions">
             {vehicle.dimensions.length === 0 ? (
-              <p className="text-[13px] text-text-muted">No dimension scores reported.</p>
+              <p className="text-[13px] text-text-muted">
+                No dimension scores reported.
+              </p>
             ) : (
               <ul className="space-y-3">
                 {vehicle.dimensions.map((dimension) => (
                   <li key={dimension.key} className="flex items-center gap-3">
-                    <span className="w-32 flex-none text-[13px] text-text-secondary">{dimension.label}</span>
+                    <span className="w-32 flex-none text-[13px] text-text-secondary">
+                      {dimension.label}
+                    </span>
                     <div className="flex-1">
                       <HealthBar score={dimension.score} />
                     </div>
@@ -201,11 +229,17 @@ export default async function VehicleDetailPage({
 
           <Panel title="Detected Signals">
             {vehicle.detectedSignals.length === 0 ? (
-              <p className="text-[13px] text-text-muted">No anomaly signals detected against this vehicle&apos;s baseline.</p>
+              <p className="text-[13px] text-text-muted">
+                No anomaly signals detected against this vehicle&apos;s
+                baseline.
+              </p>
             ) : (
               <ul className="space-y-2">
                 {vehicle.detectedSignals.map((signal) => (
-                  <li key={signal} className="flex items-start gap-2 text-[13px] text-text-secondary">
+                  <li
+                    key={signal}
+                    className="flex items-start gap-2 text-[13px] text-text-secondary"
+                  >
                     <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[var(--status-warning)]" />
                     {signal}
                   </li>
@@ -214,15 +248,22 @@ export default async function VehicleDetailPage({
             )}
           </Panel>
 
-          <Panel title="AI Insight" action={<Sparkles size={16} className="text-[var(--series-1)]" />}>
+          <Panel
+            title="AI Insight"
+            action={<Sparkles size={16} className="text-[var(--series-1)]" />}
+          >
             <p
               className="text-[13px] font-medium leading-relaxed"
-              style={{ color: riskWarningColor(vehicle.riskCategoryRaw ?? "LOW") }}
+              style={{
+                color: riskWarningColor(vehicle.riskCategoryRaw ?? "LOW"),
+              }}
             >
               {vehicle.likelyIssue ?? "No significant risk identified"}
             </p>
             {vehicle.riskNote && (
-              <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary">{vehicle.riskNote}</p>
+              <p className="mt-3 text-[12.5px] leading-relaxed text-text-secondary">
+                {vehicle.riskNote}
+              </p>
             )}
             <dl className="mt-4 space-y-1.5 border-t border-[var(--border-hairline)] pt-3 text-[12px]">
               <div className="flex justify-between gap-3">
@@ -241,11 +282,15 @@ export default async function VehicleDetailPage({
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-text-muted">SLA</dt>
-                <dd className="text-right font-medium text-text-secondary">{vehicle.sla ?? "—"}</dd>
+                <dd className="text-right font-medium text-text-secondary">
+                  {vehicle.sla ?? "—"}
+                </dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-text-muted">Scored at</dt>
-                <dd className="font-medium text-text-secondary">{scoredLabel}</dd>
+                <dd className="font-medium text-text-secondary">
+                  {scoredLabel}
+                </dd>
               </div>
             </dl>
           </Panel>

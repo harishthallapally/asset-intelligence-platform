@@ -11,7 +11,10 @@ import { HealthDonut } from "@/components/dashboard/HealthDonut";
 import { HealthTrendChart } from "@/components/dashboard/HealthTrendChart";
 import { RiskSummaryPanel } from "@/components/dashboard/RiskSummaryPanel";
 import { TopAtRiskTable } from "@/components/dashboard/TopAtRiskTable";
-import { TopRiskAssets, type RankedAsset } from "@/components/dashboard/TopRiskAssets";
+import {
+  TopRiskAssets,
+  type RankedAsset,
+} from "@/components/dashboard/TopRiskAssets";
 import { getDashboardData } from "@/lib/api/dashboard";
 import { getTopRiskAssets } from "@/lib/api/resources";
 import { operationsRiskHref } from "@/lib/api/normalise";
@@ -53,7 +56,9 @@ export default async function DashboardPage({
   const stationItems: RiskItem[] = stations.map((station) => ({
     id: station.stationId,
     href: `/stations/${station.stationId}`,
-    detail: station.likelyIssue ?? (station.online ? "No issue reported" : "Station offline"),
+    detail:
+      station.likelyIssue ??
+      (station.online ? "No issue reported" : "Station offline"),
     risk: station.riskScore ?? 0,
     tag: !station.online ? "Offline" : (station.priority ?? undefined),
   }));
@@ -61,14 +66,20 @@ export default async function DashboardPage({
   // charger_id repeats across stations (CHG01..CHG15 reused at every
   // station), so the row key and link both need the station id too.
   const chargerItems: RiskItem[] = chargers
-    .filter((charger) => charger.faulty || !charger.online || isHighRisk(charger))
+    .filter(
+      (charger) => charger.faulty || !charger.online || isHighRisk(charger),
+    )
     .map((charger) => ({
       id: charger.chargerId,
       key: `${charger.stationId}-${charger.chargerId}`,
       href: `/chargers/${charger.chargerId}?station=${charger.stationId}`,
       detail: charger.likelyIssue ?? `${charger.dockId} · ${charger.stationId}`,
       risk: charger.riskScore ?? 0,
-      tag: charger.faulty ? "Faulty" : !charger.online ? "Offline" : (charger.priority ?? undefined),
+      tag: charger.faulty
+        ? "Faulty"
+        : !charger.online
+          ? "Offline"
+          : (charger.priority ?? undefined),
     }));
 
   // GET /operations/risk's own cross-asset-type row -> this panel's shape.
@@ -108,26 +119,43 @@ export default async function DashboardPage({
     tag: row.priority,
   }));
 
-  // No dedicated top-at-risk-vehicles fetch yet — reuses the same
-  // cross-asset-type ranking the Top Risk Assets panel already fetched.
-  const vehicleItems: RiskItem[] = topRiskAssets
-    .filter((asset) => asset.kind === "vehicle")
-    .map((asset) => ({
-      id: asset.id,
-      key: asset.key,
-      href: asset.href,
-      detail: asset.issue,
-      risk: asset.risk,
-      tag: asset.tag,
+  // Keep the vehicle card on the vehicle-specific rows from the command
+  // center response. The balanced cross-asset ranking is for the separate
+  // Top Risk Assets panel and is not guaranteed to include vehicles.
+  const vehicleItems: RiskItem[] = data.atRiskVehicles
+    .filter((vehicle) => {
+      const category = vehicle.riskCategoryRaw?.toUpperCase();
+      return (
+        vehicle.riskScore !== null &&
+        (category === "HIGH" || category === "CRITICAL")
+      );
+    })
+    .map((vehicle) => ({
+      id: vehicle.assetId,
+      key: vehicle.assetId,
+      href: `/vehicles/${vehicle.assetId}`,
+      detail:
+        (vehicle.likelyIssue ??
+          [vehicle.manufacturer, vehicle.model, vehicle.homeStationId]
+            .filter(Boolean)
+            .join(" · ")) ||
+        "No issue reported",
+      risk: vehicle.riskScore!,
+      tag: vehicle.priority ?? undefined,
     }));
 
   return (
-    <PageShell title="Dashboard" subtitle="Overview of Stations, Chargers & Batteries">
+    <PageShell
+      title="Dashboard"
+      subtitle="Overview of Stations, Chargers & Batteries"
+    >
       <div className="flex flex-col gap-3">
         <DataSourceBadge source={data.source} />
         <CriticalAlertBanner rows={data.atRisk} />
 
-        <div className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${data.vehicles ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+        <div
+          className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${data.vehicles ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
+        >
           <StatCard
             icon={Warehouse}
             iconBg="color-mix(in srgb, var(--series-7) 12%, transparent)"
@@ -137,7 +165,11 @@ export default async function DashboardPage({
             href="/stations"
             breakdown={[
               { label: "Online", value: stationCounts.online, tone: "good" },
-              { label: "Offline", value: stationCounts.offline, tone: "critical" },
+              {
+                label: "Offline",
+                value: stationCounts.offline,
+                tone: "critical",
+              },
             ]}
             items={stationItems}
             emptyMessage="All stations healthy."
@@ -153,7 +185,11 @@ export default async function DashboardPage({
             // three figures sit alongside each other rather than summing.
             breakdown={[
               { label: "Online", value: chargerCounts.online, tone: "good" },
-              { label: "Offline", value: chargerCounts.offline, tone: "critical" },
+              {
+                label: "Offline",
+                value: chargerCounts.offline,
+                tone: "critical",
+              },
               { label: "Faulty", value: chargerCounts.faulty, tone: "warning" },
             ]}
             items={chargerItems}
@@ -167,9 +203,21 @@ export default async function DashboardPage({
             value={batteries.total}
             href="/batteries"
             breakdown={[
-              { label: "Health", value: `${batteries.overallHealth}/100`, tone: "good" },
-              { label: "High risk", value: batteries.highRisk, tone: "warning" },
-              { label: "Predicted", value: batteries.predictedFailures, tone: "critical" },
+              {
+                label: "Health",
+                value: `${batteries.overallHealth}/100`,
+                tone: "good",
+              },
+              {
+                label: "High risk",
+                value: batteries.highRisk,
+                tone: "warning",
+              },
+              {
+                label: "Predicted",
+                value: batteries.predictedFailures,
+                tone: "critical",
+              },
             ]}
             items={batteryItems}
             emptyMessage="No battery above the Low risk band."
@@ -184,10 +232,24 @@ export default async function DashboardPage({
               href="/vehicles"
               breakdown={[
                 ...(data.vehicles.overallHealth != null
-                  ? [{ label: "Health", value: `${Math.round(data.vehicles.overallHealth)}/100`, tone: "good" as const }]
+                  ? [
+                      {
+                        label: "Health",
+                        value: `${Math.round(data.vehicles.overallHealth)}/100`,
+                        tone: "good" as const,
+                      },
+                    ]
                   : []),
-                { label: "High risk", value: data.vehicles.highRisk, tone: "warning" as const },
-                { label: "Predicted", value: data.vehicles.predictedFailures, tone: "critical" as const },
+                {
+                  label: "High risk",
+                  value: data.vehicles.highRisk,
+                  tone: "warning" as const,
+                },
+                {
+                  label: "Predicted",
+                  value: data.vehicles.predictedFailures,
+                  tone: "critical" as const,
+                },
               ]}
               items={vehicleItems}
               emptyMessage="No vehicle above the Low risk band."
@@ -205,14 +267,21 @@ export default async function DashboardPage({
             <TopRiskAssets assets={topRiskAssets} limit={5} />
           </Panel>
 
-          <Panel title="Top Critical Alerts" className="lg:col-span-5" action={<ViewAllLink href="/alerts" />}>
+          <Panel
+            title="Top Critical Alerts"
+            className="lg:col-span-5"
+            action={<ViewAllLink href="/alerts" />}
+          >
             <AlertsPanel alerts={data.alerts} />
           </Panel>
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           <Panel title="Asset Health Distribution" titleNote="(all assets)">
-            <HealthDonut buckets={data.healthBuckets} total={data.distributionTotal} />
+            <HealthDonut
+              buckets={data.healthBuckets}
+              total={data.distributionTotal}
+            />
           </Panel>
 
           <Panel
@@ -220,7 +289,10 @@ export default async function DashboardPage({
             titleNote="(Next 24 Hrs)"
             footer={
               <div className="flex justify-center">
-                <ViewAllLink href="/ai-predictions" label="View All Predictions" />
+                <ViewAllLink
+                  href="/ai-predictions"
+                  label="View All Predictions"
+                />
               </div>
             }
           >
@@ -233,10 +305,7 @@ export default async function DashboardPage({
             />
           </Panel>
 
-          <Panel
-            title="Top Failure Reasons"
-            titleNote="(Next 24 Hrs)"
-          >
+          <Panel title="Top Failure Reasons" titleNote="(Next 24 Hrs)">
             <FailureReasonsPanel reasons={data.failureReasons} />
           </Panel>
         </div>
@@ -265,7 +334,6 @@ export default async function DashboardPage({
           >
             <TopAtRiskTable rows={data.atRisk} />
           </Panel>
-
         </div>
       </div>
     </PageShell>

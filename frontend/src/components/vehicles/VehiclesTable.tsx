@@ -30,7 +30,9 @@ const BAND_MEMBERS: Record<string, string[]> = {
 function bandOf(classification: string | null): string | null {
   if (!classification) return null;
   const value = classification.toUpperCase();
-  const entry = Object.entries(BAND_MEMBERS).find(([, members]) => members.includes(value));
+  const entry = Object.entries(BAND_MEMBERS).find(([, members]) =>
+    members.includes(value),
+  );
   return entry ? entry[0] : null;
 }
 
@@ -46,7 +48,10 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
       header: "Vehicle",
       sortValue: (r) => r.assetId,
       render: (r) => (
-        <Link href={`/vehicles/${r.assetId}`} className="font-medium text-[var(--series-1)] hover:underline">
+        <Link
+          href={`/vehicles/${r.assetId}`}
+          className="font-medium text-[var(--series-1)] hover:underline"
+        >
           {r.assetId}
         </Link>
       ),
@@ -76,7 +81,8 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
           className="font-medium"
           style={{
             color: r.healthClassification
-              ? (CLASSIFICATION_TONE[r.healthClassification.toUpperCase()] ?? "var(--text-secondary)")
+              ? (CLASSIFICATION_TONE[r.healthClassification.toUpperCase()] ??
+                "var(--text-secondary)")
               : "var(--text-muted)",
           }}
         >
@@ -88,7 +94,12 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
       key: "health",
       header: "Health Score",
       sortValue: (r) => r.healthScore ?? 0,
-      render: (r) => (r.healthScore != null ? <HealthBar score={r.healthScore} /> : <span className="text-text-muted">—</span>),
+      render: (r) =>
+        r.healthScore != null ? (
+          <HealthBar score={r.healthScore} />
+        ) : (
+          <span className="text-text-muted">—</span>
+        ),
     },
     {
       key: "risk",
@@ -96,7 +107,10 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
       sortValue: (r) => r.riskScore ?? 0,
       render: (r) =>
         r.riskScore != null ? (
-          <RiskPill percent={r.riskScore} category={r.riskCategoryRaw ?? "LOW"} />
+          <RiskPill
+            percent={r.riskScore}
+            category={r.riskCategoryRaw ?? "LOW"}
+          />
         ) : (
           <span className="text-text-muted">—</span>
         ),
@@ -105,21 +119,29 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
       key: "priority",
       header: "Priority",
       sortValue: (r) => r.priority ?? "",
-      render: (r) => <span className="tabular-nums text-text-secondary">{r.priority ?? "—"}</span>,
+      render: (r) => (
+        <span className="tabular-nums text-text-secondary">
+          {r.priority ?? "—"}
+        </span>
+      ),
     },
     {
       key: "issue",
       header: "Likely Issue",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) => (
-        <span className="block max-w-[280px] truncate" title={r.likelyIssue ?? undefined}>
+        <span
+          className="block max-w-[280px] truncate"
+          title={r.likelyIssue ?? undefined}
+        >
           {r.likelyIssue ?? "—"}
         </span>
       ),
     },
   ];
 
-  const countOf = (band: string) => rows.filter((r) => bandOf(r.healthClassification) === band).length;
+  const countOf = (band: string) =>
+    rows.filter((r) => bandOf(r.healthClassification) === band).length;
 
   return (
     <DataTable

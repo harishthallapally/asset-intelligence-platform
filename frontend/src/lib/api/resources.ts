@@ -103,8 +103,12 @@ export function getBatteriesPage(): Promise<Loaded<BatteriesPageData>> {
   });
 }
 
-export function getBatteryDetail(batteryId: string): Promise<Loaded<BatteryDetailView>> {
-  return load(async () => normaliseBatteryDetail(await fetchBattery(batteryId)));
+export function getBatteryDetail(
+  batteryId: string,
+): Promise<Loaded<BatteryDetailView>> {
+  return load(async () =>
+    normaliseBatteryDetail(await fetchBattery(batteryId)),
+  );
 }
 
 export interface VehiclesPageData {
@@ -122,7 +126,9 @@ export function getVehiclesPage(): Promise<Loaded<VehiclesPageData>> {
   });
 }
 
-export function getVehicleDetail(assetId: string): Promise<Loaded<VehicleDetailView>> {
+export function getVehicleDetail(
+  assetId: string,
+): Promise<Loaded<VehicleDetailView>> {
   return load(async () => normaliseVehicleDetail(await fetchVehicle(assetId)));
 }
 
@@ -135,7 +141,9 @@ export function getVehicleDetail(assetId: string): Promise<Loaded<VehicleDetailV
  * View's hotspots quietly show nothing. */
 export async function getOperationsRiskRows(): Promise<OperationsRiskRow[]> {
   try {
-    return (await fetchOperationsRisk({ assetType: "DOCK", limit: 500 })).map(normaliseOperationsRisk);
+    return (await fetchOperationsRisk({ assetType: "DOCK", limit: 500 })).map(
+      normaliseOperationsRisk,
+    );
   } catch {
     return [];
   }
@@ -148,11 +156,18 @@ export async function getOperationsRiskRows(): Promise<OperationsRiskRow[]> {
  * "what needs attention right now", not a client-side recombination of
  * separately-fetched per-type lists. Never throws — an empty list just
  * means the Top Risk Assets panel shows nothing. */
-export async function getTopRiskAssets(limit = 10): Promise<OperationsRiskRow[]> {
+export async function getTopRiskAssets(
+  limit = 10,
+): Promise<OperationsRiskRow[]> {
   try {
-    return (await fetchOperationsRisk({ sortBy: "risk", order: "desc", limit, mix: "balanced" })).map(
-      normaliseOperationsRisk,
-    );
+    return (
+      await fetchOperationsRisk({
+        sortBy: "risk",
+        order: "desc",
+        limit,
+        mix: "balanced",
+      })
+    ).map(normaliseOperationsRisk);
   } catch {
     return [];
   }
@@ -173,10 +188,14 @@ export function getStationsPage(): Promise<Loaded<StationsPageData>> {
       fetchStationsSummary().catch(() => null),
       fetchStationScores().catch(() => []),
     ]);
-    const scoreByStation = new Map(scores.map((s) => [s.station_id.toLowerCase(), s]));
+    const scoreByStation = new Map(
+      scores.map((s) => [s.station_id.toLowerCase(), s]),
+    );
     const rows = apiRows
       .map(normaliseStation)
-      .map((row) => mergeStationScore(row, scoreByStation.get(row.stationId.toLowerCase())));
+      .map((row) =>
+        mergeStationScore(row, scoreByStation.get(row.stationId.toLowerCase())),
+      );
     return { rows, summary };
   });
 }
@@ -194,15 +213,27 @@ export interface StationDetailData {
   telemetry: AssetTelemetryPointView[];
 }
 
+export interface VehicleDetailData {
+  vehicle: VehicleDetailView;
+  /** Home-station dock telemetry used as operational context; the platform
+   * does not expose a native vehicle telemetry-history endpoint. */
+  telemetry: AssetTelemetryPointView[];
+}
+
 /** This platform's dock register (GET /assets) ids docks as
  * "QIS-{station digits}-{dock digits}" — the same convention
  * `deriveDockAssetId` builds one of; here every dock belonging to a station
  * is found by that prefix instead, since the point is "all of them", not one. */
-function dockAssetIdsForStation(stationId: string, assets: { asset_id: string }[]): string[] {
+function dockAssetIdsForStation(
+  stationId: string,
+  assets: { asset_id: string }[],
+): string[] {
   const stationDigits = stationId.match(/(\d+)/)?.[1]?.padStart(3, "0");
   if (!stationDigits) return [];
   const prefix = `QIS-${stationDigits}-`;
-  return assets.filter((a) => a.asset_id.startsWith(prefix)).map((a) => a.asset_id);
+  return assets
+    .filter((a) => a.asset_id.startsWith(prefix))
+    .map((a) => a.asset_id);
 }
 
 /**
@@ -212,7 +243,9 @@ function dockAssetIdsForStation(stationId: string, assets: { asset_id: string }[
  * pull the charger or battery registers — those have their own list pages,
  * scoped to this station via `?station=`, rather than being duplicated here.
  */
-export function getStationDetail(stationId: string): Promise<Loaded<StationDetailData>> {
+export function getStationDetail(
+  stationId: string,
+): Promise<Loaded<StationDetailData>> {
   return load(async () => {
     const [stations, scoring, assets] = await Promise.all([
       fetchStations(),
@@ -221,18 +254,25 @@ export function getStationDetail(stationId: string): Promise<Loaded<StationDetai
         .catch(() => null),
       fetchAssets().catch(() => []),
     ]);
-    const match = stations.find((s) => s.station_id.toLowerCase() === stationId.toLowerCase());
-    if (!match) throw new ApiUnavailableError(`Station ${stationId} was not found`, 404);
+    const match = stations.find(
+      (s) => s.station_id.toLowerCase() === stationId.toLowerCase(),
+    );
+    if (!match)
+      throw new ApiUnavailableError(`Station ${stationId} was not found`, 404);
 
     const dockAssetIds = dockAssetIdsForStation(stationId, assets);
     const perDockTelemetry = await Promise.all(
-      dockAssetIds.map((assetId) => fetchAssetTelemetry(assetId, 14).catch(() => [])),
+      dockAssetIds.map((assetId) =>
+        fetchAssetTelemetry(assetId, 14).catch(() => []),
+      ),
     );
 
     return {
       station: normaliseStation(match),
       scoring,
-      telemetry: aggregateStationTelemetry(perDockTelemetry.map(normaliseAssetTelemetry)),
+      telemetry: aggregateStationTelemetry(
+        perDockTelemetry.map(normaliseAssetTelemetry),
+      ),
     };
   });
 }
@@ -242,11 +282,19 @@ export function getChargersPage(): Promise<Loaded<ChargerRow[]>> {
     // GET /chargers/scores is the charger's own real AI score, keyed by the
     // fleet-unique charger_uid ("<station_id>-<charger_id>") — a second
     // independent call so its failure doesn't blank the charger list.
-    const [chargers, scores] = await Promise.all([fetchChargers(), fetchChargerScores().catch(() => [])]);
-    const scoreByUid = new Map(scores.map((s) => [s.charger_uid.toLowerCase(), s]));
+    const [chargers, scores] = await Promise.all([
+      fetchChargers(),
+      fetchChargerScores().catch(() => []),
+    ]);
+    const scoreByUid = new Map(
+      scores.map((s) => [s.charger_uid.toLowerCase(), s]),
+    );
     return chargers.map((c) => {
       const row = normaliseCharger(c);
-      return mergeChargerScore(row, scoreByUid.get(`${row.stationId}-${row.chargerId}`.toLowerCase()));
+      return mergeChargerScore(
+        row,
+        scoreByUid.get(`${row.stationId}-${row.chargerId}`.toLowerCase()),
+      );
     });
   });
 }
@@ -284,9 +332,15 @@ export interface ChargerDetailData {
  * station used to build charger_uid) — callers should always supply it when
  * known.
  */
-export function getChargerDetail(chargerId: string, stationId?: string): Promise<Loaded<ChargerDetailData>> {
+export function getChargerDetail(
+  chargerId: string,
+  stationId?: string,
+): Promise<Loaded<ChargerDetailData>> {
   return load(async () => {
-    const [chargers, stations] = await Promise.all([fetchChargers(), fetchStations().catch(() => [])]);
+    const [chargers, stations] = await Promise.all([
+      fetchChargers(),
+      fetchStations().catch(() => []),
+    ]);
     const match = chargers.find(
       (c) =>
         c.charger_id.toLowerCase() === chargerId.toLowerCase() &&
@@ -294,19 +348,27 @@ export function getChargerDetail(chargerId: string, stationId?: string): Promise
     );
     if (!match) {
       throw new ApiUnavailableError(
-        stationId ? `Charger ${chargerId} was not found at station ${stationId}` : `Charger ${chargerId} was not found`,
+        stationId
+          ? `Charger ${chargerId} was not found at station ${stationId}`
+          : `Charger ${chargerId} was not found`,
         404,
       );
     }
 
     const charger = normaliseCharger(match);
-    const stationMatch = stations.find((s) => s.station_id.toLowerCase() === charger.stationId.toLowerCase());
+    const stationMatch = stations.find(
+      (s) => s.station_id.toLowerCase() === charger.stationId.toLowerCase(),
+    );
     const chargerUid = `${charger.stationId}-${charger.chargerId}`;
     const dockAssetId = deriveDockAssetId(charger.stationId, charger.dockId);
 
     const [scoring, telemetryPoints] = await Promise.all([
-      fetchChargerDetail(chargerUid).then(normaliseChargerDetail).catch(() => null),
-      dockAssetId ? fetchAssetTelemetry(dockAssetId, 14).catch(() => []) : Promise.resolve([]),
+      fetchChargerDetail(chargerUid)
+        .then(normaliseChargerDetail)
+        .catch(() => null),
+      dockAssetId
+        ? fetchAssetTelemetry(dockAssetId, 14).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
     return {
@@ -344,7 +406,8 @@ export interface HeaderContext {
  * on its own — a station-list failure should not blank the alert badge.
  */
 export async function getHeaderContext(): Promise<HeaderContext> {
-  if (!apiBaseUrl()) return { locations: [], alertCount: 0, alerts: [], dataAsOf: null };
+  if (!apiBaseUrl())
+    return { locations: [], alertCount: 0, alerts: [], dataAsOf: null };
 
   const [stations, commandCenter] = await Promise.all([
     fetchStations().catch(() => []),
@@ -379,15 +442,23 @@ export function getAssetsPage(): Promise<Loaded<AssetRow[]>> {
  * (BATTERY/STATION/DOCK/CHARGER), ~4,000 rows on this fleet. This is the
  * platform's real predictive-risk register, backing the AI Predictions page.
  */
-export function getPredictiveWarningsPage(): Promise<Loaded<PredictiveWarningRow[]>> {
-  return load(async () => (await fetchPredictiveWarnings()).map(normalisePredictiveWarning));
+export function getPredictiveWarningsPage(): Promise<
+  Loaded<PredictiveWarningRow[]>
+> {
+  return load(async () =>
+    (await fetchPredictiveWarnings()).map(normalisePredictiveWarning),
+  );
 }
 
 export type AlertRow = DashboardAlert;
 
 /** GET /operations/alerts — the real alert feed backing the Alerts page. */
-export function getOperationsAlertsPage(limit = 200): Promise<Loaded<AlertRow[]>> {
-  return load(async () => (await fetchOperationsAlerts(limit)).map(normaliseAlert));
+export function getOperationsAlertsPage(
+  limit = 200,
+): Promise<Loaded<AlertRow[]>> {
+  return load(async () =>
+    (await fetchOperationsAlerts(limit)).map(normaliseAlert),
+  );
 }
 
 /**
@@ -395,8 +466,13 @@ export function getOperationsAlertsPage(limit = 200): Promise<Loaded<AlertRow[]>
  * telemetry-history endpoint the platform exposes; there is no per-battery or
  * per-charger equivalent, so callers resolve to a dock asset id first.
  */
-export function getAssetTelemetryPoints(assetId: string, days = 14): Promise<Loaded<AssetTelemetryPointView[]>> {
-  return load(async () => normaliseAssetTelemetry(await fetchAssetTelemetry(assetId, days)));
+export function getAssetTelemetryPoints(
+  assetId: string,
+  days = 14,
+): Promise<Loaded<AssetTelemetryPointView[]>> {
+  return load(async () =>
+    normaliseAssetTelemetry(await fetchAssetTelemetry(assetId, days)),
+  );
 }
 
 export interface DemoContext {
@@ -418,7 +494,9 @@ export async function getDemoContext(): Promise<Loaded<DemoContext>> {
     return {
       datasets: datasets.map((d) => ({
         code: d.name,
-        label: d.name.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: d.name
+          .replace(/[_-]+/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
       })),
       scenarios: scenarios.map((s) => ({ code: s.code, label: s.label })),
       assets: assets.map((a) => ({

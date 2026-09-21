@@ -103,6 +103,8 @@ export interface DashboardData {
   riskNotes: { maintenanceDue: string | null };
   alerts: DashboardAlert[];
   atRisk: AtRiskRow[];
+  /** Vehicle-specific risk rows from the command-center API. */
+  atRiskVehicles: VehicleRow[];
   failureReasons: { reason: string; count: number; pct: number }[];
   /** null until the service exposes it — the chart is hidden when null. */
   healthTrend: TrendPoint[] | null;
@@ -120,8 +122,10 @@ const STATE_LABEL: Record<HealthState, string> = {
 export function alertTone(severity: string): AlertTone {
   const s = severity.toUpperCase();
   if (s.includes("CRITICAL") || s.includes("FATAL")) return "critical";
-  if (s.includes("HIGH") || s.includes("SEVERE") || s.includes("ERROR")) return "serious";
-  if (s.includes("WARN") || s.includes("MEDIUM") || s.includes("MODERATE")) return "warning";
+  if (s.includes("HIGH") || s.includes("SEVERE") || s.includes("ERROR"))
+    return "serious";
+  if (s.includes("WARN") || s.includes("MEDIUM") || s.includes("MODERATE"))
+    return "warning";
   return "neutral";
 }
 
@@ -152,7 +156,9 @@ function realAssetId(entityId: string): boolean {
 }
 
 function entityLabel(alert: ApiAlert): string {
-  const type = alert.entity_type ? alert.entity_type.charAt(0).toUpperCase() + alert.entity_type.slice(1) : "Entity";
+  const type = alert.entity_type
+    ? alert.entity_type.charAt(0).toUpperCase() + alert.entity_type.slice(1)
+    : "Entity";
   if (realAssetId(alert.entity_id)) return `${type} ${alert.entity_id}`;
   // Not a real per-asset id — station_id is always real, so say that instead
   // of presenting the opaque reference as if it named the asset.
@@ -197,7 +203,9 @@ function trendLabel(date: string): string {
   return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function normaliseTrend(points: ApiHealthTrendPoint[] | null | undefined): TrendPoint[] | null {
+export function normaliseTrend(
+  points: ApiHealthTrendPoint[] | null | undefined,
+): TrendPoint[] | null {
   if (!points || points.length === 0) return null;
   return points.map((point) => ({
     label: trendLabel(point.date),
@@ -207,7 +215,10 @@ export function normaliseTrend(points: ApiHealthTrendPoint[] | null | undefined)
   }));
 }
 
-export function normaliseCommandCenter(payload: ApiCommandCenter, source: DataSource): DashboardData {
+export function normaliseCommandCenter(
+  payload: ApiCommandCenter,
+  source: DataSource,
+): DashboardData {
   const b = payload.batteries;
   const total = b.total;
 
@@ -244,6 +255,7 @@ export function normaliseCommandCenter(payload: ApiCommandCenter, source: DataSo
       predictionWindow: row.prediction_window,
       failureInHours: row.failure_in_hours ?? null,
     })),
+    atRiskVehicles: (payload.top_at_risk_vehicles ?? []).map(normaliseVehicle),
     failureReasons: (payload.top_failure_reasons ?? []).map((r) => ({
       reason: r.reason,
       count: r.count,
@@ -336,7 +348,10 @@ export interface StationRow {
  * that can succeed or fail independently. Prefers the composite risk figures
  * over the raw ones whenever an insight actually applies (composite_risk_score
  * non-null) — see StationRow's riskScore doc. */
-export function mergeStationScore(row: StationRow, score: ApiStationScore | undefined): StationRow {
+export function mergeStationScore(
+  row: StationRow,
+  score: ApiStationScore | undefined,
+): StationRow {
   if (!score) return row;
   const hasComposite = score.composite_risk_score !== null;
   return {
@@ -346,8 +361,12 @@ export function mergeStationScore(row: StationRow, score: ApiStationScore | unde
     anomalyScore: score.anomaly_score,
     anomalySeverity: score.anomaly_severity,
     riskScore: hasComposite ? score.composite_risk_score : score.risk_score,
-    riskCategoryRaw: hasComposite ? (score.composite_risk_category ?? score.risk_category) : score.risk_category,
-    priority: hasComposite ? (score.composite_priority ?? score.priority) : score.priority,
+    riskCategoryRaw: hasComposite
+      ? (score.composite_risk_category ?? score.risk_category)
+      : score.risk_category,
+    priority: hasComposite
+      ? (score.composite_priority ?? score.priority)
+      : score.priority,
     likelyIssue: score.likely_issue,
     riskEscalated: score.composite_escalated,
     baseRiskScore: score.risk_score,
@@ -380,9 +399,7 @@ export interface ChargerRow {
 
 /** Turns an API dimension key such as `charging_electrical` into a label. */
 function dimensionLabel(key: string): string {
-  return key
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function normaliseBattery(row: ApiBattery): BatteryRow {
@@ -402,14 +419,18 @@ export function normaliseBattery(row: ApiBattery): BatteryRow {
   };
 }
 
-export function normaliseBatteryDetail(detail: ApiBatteryDetail): BatteryDetailView {
+export function normaliseBatteryDetail(
+  detail: ApiBatteryDetail,
+): BatteryDetailView {
   return {
     ...normaliseBattery(detail),
-    dimensions: Object.entries(detail.dimension_scores ?? {}).map(([key, score]) => ({
-      key,
-      label: dimensionLabel(key),
-      score,
-    })),
+    dimensions: Object.entries(detail.dimension_scores ?? {}).map(
+      ([key, score]) => ({
+        key,
+        label: dimensionLabel(key),
+        score,
+      }),
+    ),
     detectedSignals: detail.detected_signals ?? [],
     sla: detail.sla,
     businessImpact: detail.business_impact,
@@ -495,7 +516,9 @@ export function normaliseVehicle(row: ApiVehicleSummary): VehicleRow {
   };
 }
 
-export function normaliseVehicleDetail(detail: ApiVehicleDetail): VehicleDetailView {
+export function normaliseVehicleDetail(
+  detail: ApiVehicleDetail,
+): VehicleDetailView {
   const warranty = detail.battery_warranty;
   return {
     ...normaliseVehicle(detail),
@@ -584,7 +607,10 @@ export function normaliseCharger(row: ApiCharger): ChargerRow {
  * platform now also exposes a real per-charger score directly (GET
  * /chargers/scores, see `mergeChargerScore` below) — this dock-derived path
  * predates that and is a candidate to retire in a future pass. */
-export function mergeChargerDockRisk(row: ChargerRow, asset: ApiAsset | undefined): ChargerRow {
+export function mergeChargerDockRisk(
+  row: ChargerRow,
+  asset: ApiAsset | undefined,
+): ChargerRow {
   if (!asset) return row;
   return {
     ...row,
@@ -602,7 +628,10 @@ export function mergeChargerDockRisk(row: ChargerRow, asset: ApiAsset | undefine
 /** Merges the charger's own real AI score (GET /chargers/scores) into a
  * charger row — keyed by the fleet-unique charger_uid
  * ("<station_id>-<charger_id>"), not the reused charger_id alone. */
-export function mergeChargerScore(row: ChargerRow, score: ApiChargerScore | undefined): ChargerRow {
+export function mergeChargerScore(
+  row: ChargerRow,
+  score: ApiChargerScore | undefined,
+): ChargerRow {
   if (!score) return row;
   return {
     ...row,
@@ -659,7 +688,9 @@ export interface ChargerDetailView {
   currentBattery: ChargerCurrentBatteryView | null;
 }
 
-export function normaliseChargerDetail(detail: ApiChargerDetail): ChargerDetailView {
+export function normaliseChargerDetail(
+  detail: ApiChargerDetail,
+): ChargerDetailView {
   return {
     chargerUid: detail.charger_uid,
     chargerId: detail.charger_id,
@@ -679,11 +710,13 @@ export function normaliseChargerDetail(detail: ApiChargerDetail): ChargerDetailV
     likelyIssue: detail.likely_issue,
     predictionWindow: detail.prediction_window,
     scoredAt: detail.scored_at,
-    dimensions: Object.entries(detail.dimension_scores ?? {}).map(([key, score]) => ({
-      key,
-      label: dimensionLabel(key),
-      score,
-    })),
+    dimensions: Object.entries(detail.dimension_scores ?? {}).map(
+      ([key, score]) => ({
+        key,
+        label: dimensionLabel(key),
+        score,
+      }),
+    ),
     detectedSignals: detail.detected_signals ?? [],
     sla: detail.sla,
     businessImpact: detail.business_impact,
@@ -760,17 +793,21 @@ function inferStationId(assetType: string, assetId: string): string | null {
     const digits = assetId.match(/^QIS-(\d+)-\d+$/i)?.[1];
     return digits ? `QIS${digits}` : null;
   }
-  if (assetType === "CHARGER") return assetId.match(/^(QIS\d+)-CHG\d+$/i)?.[1] ?? null;
+  if (assetType === "CHARGER")
+    return assetId.match(/^(QIS\d+)-CHG\d+$/i)?.[1] ?? null;
   return null;
 }
 
-export function normaliseOperationsRisk(row: ApiOperationsRiskItem): OperationsRiskRow {
+export function normaliseOperationsRisk(
+  row: ApiOperationsRiskItem,
+): OperationsRiskRow {
   const assetType = row.asset_type ?? inferAssetType(row.asset_id);
   return {
     assetType,
     assetId: row.asset_id,
     stationId: row.station_id ?? inferStationId(assetType, row.asset_id),
-    dockId: assetType.toUpperCase() === "DOCK" ? parseDockId(row.asset_id) : null,
+    dockId:
+      assetType.toUpperCase() === "DOCK" ? parseDockId(row.asset_id) : null,
     location: row.location,
     riskScore: row.risk_score,
     riskCategoryRaw: row.risk_category,
@@ -795,8 +832,12 @@ export function operationsRiskHref(row: OperationsRiskRow): string | null {
     case "CHARGER": {
       // charger_uid is "<station_id>-<charger_id>" — both halves are
       // themselves hyphen-free, so this split is exact.
-      const chargerId = row.stationId ? row.assetId.slice(row.stationId.length + 1) : null;
-      return chargerId && row.stationId ? `/chargers/${chargerId}?station=${row.stationId}` : null;
+      const chargerId = row.stationId
+        ? row.assetId.slice(row.stationId.length + 1)
+        : null;
+      return chargerId && row.stationId
+        ? `/chargers/${chargerId}?station=${row.stationId}`
+        : null;
     }
     case "DOCK":
       return row.stationId ? `/stations/${row.stationId}` : null;
@@ -809,7 +850,10 @@ export function operationsRiskHref(row: OperationsRiskRow): string | null {
  * STATION — identical to GET /stations/scores) into its row, so this figure
  * always matches what the station's own detail/list page shows rather than
  * a dock-derived proxy. */
-export function mergeStationOperationsRisk(row: StationRow, risk: OperationsRiskRow | undefined): StationRow {
+export function mergeStationOperationsRisk(
+  row: StationRow,
+  risk: OperationsRiskRow | undefined,
+): StationRow {
   if (!risk) return row;
   return {
     ...row,
@@ -823,7 +867,10 @@ export function mergeStationOperationsRisk(row: StationRow, risk: OperationsRisk
 /** Merges a charger's own native risk (GET /operations/risk?asset_type=
  * CHARGER — identical to GET /chargers/scores) into its row, keyed by
  * charger_uid — not the dock it sits on, which can score differently. */
-export function mergeChargerOperationsRisk(row: ChargerRow, risk: OperationsRiskRow | undefined): ChargerRow {
+export function mergeChargerOperationsRisk(
+  row: ChargerRow,
+  risk: OperationsRiskRow | undefined,
+): ChargerRow {
   if (!risk) return row;
   return {
     ...row,
@@ -897,7 +944,9 @@ export interface StationDetailView {
   riskNote: string;
 }
 
-export function normaliseStationDetail(detail: ApiStationDetail): StationDetailView {
+export function normaliseStationDetail(
+  detail: ApiStationDetail,
+): StationDetailView {
   const hasComposite = detail.composite_risk_score !== null;
   return {
     stationId: detail.station_id,
@@ -906,22 +955,36 @@ export function normaliseStationDetail(detail: ApiStationDetail): StationDetailV
     healthClassification: detail.health_classification,
     anomalyScore: detail.anomaly_score,
     anomalySeverity: detail.anomaly_severity,
-    riskScore: hasComposite ? (detail.composite_risk_score as number) : detail.risk_score,
-    riskCategory: riskCategory(hasComposite ? (detail.composite_risk_category ?? detail.risk_category) : detail.risk_category),
-    riskCategoryRaw: hasComposite ? (detail.composite_risk_category ?? detail.risk_category) : detail.risk_category,
-    priority: hasComposite ? (detail.composite_priority ?? detail.priority) : detail.priority,
+    riskScore: hasComposite
+      ? (detail.composite_risk_score as number)
+      : detail.risk_score,
+    riskCategory: riskCategory(
+      hasComposite
+        ? (detail.composite_risk_category ?? detail.risk_category)
+        : detail.risk_category,
+    ),
+    riskCategoryRaw: hasComposite
+      ? (detail.composite_risk_category ?? detail.risk_category)
+      : detail.risk_category,
+    priority: hasComposite
+      ? (detail.composite_priority ?? detail.priority)
+      : detail.priority,
     likelyIssue: detail.likely_issue,
-    predictionWindow: hasComposite ? (detail.composite_prediction_window ?? detail.prediction_window) : detail.prediction_window,
+    predictionWindow: hasComposite
+      ? (detail.composite_prediction_window ?? detail.prediction_window)
+      : detail.prediction_window,
     scoredAt: detail.scored_at,
     riskEscalated: detail.composite_escalated,
     baseRiskScore: detail.risk_score,
     baseRiskCategoryRaw: detail.risk_category,
     upliftReasons: detail.uplift_reasons ?? [],
-    dimensions: Object.entries(detail.dimension_scores ?? {}).map(([key, score]) => ({
-      key,
-      label: dimensionLabel(key),
-      score,
-    })),
+    dimensions: Object.entries(detail.dimension_scores ?? {}).map(
+      ([key, score]) => ({
+        key,
+        label: dimensionLabel(key),
+        score,
+      }),
+    ),
     detectedSignals: detail.detected_signals ?? [],
     // "telemetry_risk" insights just restate the base risk_score/
     // likely_issue/prediction_window already shown above and in Detected
@@ -957,7 +1020,10 @@ export interface PredictiveWarningRow {
   href: string | null;
 }
 
-function predictiveWarningHref(assetType: string, assetId: string): string | null {
+function predictiveWarningHref(
+  assetType: string,
+  assetId: string,
+): string | null {
   const type = assetType.toUpperCase();
   if (type === "BATTERY") return `/batteries/${assetId}`;
   if (type === "STATION") return `/stations/${assetId}`;
@@ -968,7 +1034,9 @@ function predictiveWarningHref(assetType: string, assetId: string): string | nul
   return null;
 }
 
-export function normalisePredictiveWarning(row: ApiPredictiveWarning): PredictiveWarningRow {
+export function normalisePredictiveWarning(
+  row: ApiPredictiveWarning,
+): PredictiveWarningRow {
   return {
     assetType: row.asset_type,
     assetId: row.asset_id,
@@ -1036,7 +1104,9 @@ export interface AssetTelemetryPointView {
   alertCount: number;
 }
 
-export function normaliseAssetTelemetry(points: ApiAssetTelemetryPoint[]): AssetTelemetryPointView[] {
+export function normaliseAssetTelemetry(
+  points: ApiAssetTelemetryPoint[],
+): AssetTelemetryPointView[] {
   return points.map((p) => ({
     date: p.date,
     temperature: p.charger_temperature_mean,
@@ -1054,7 +1124,9 @@ export function normaliseAssetTelemetry(points: ApiAssetTelemetryPoint[]): Asset
  * dock at that station on each date (summing alert counts, since that's a
  * total rather than a mean). Docks that don't report on a given date simply
  * don't contribute to that date's average. */
-export function aggregateStationTelemetry(perDock: AssetTelemetryPointView[][]): AssetTelemetryPointView[] {
+export function aggregateStationTelemetry(
+  perDock: AssetTelemetryPointView[][],
+): AssetTelemetryPointView[] {
   const byDate = new Map<string, AssetTelemetryPointView[]>();
   for (const series of perDock) {
     for (const point of series) {
@@ -1065,8 +1137,13 @@ export function aggregateStationTelemetry(perDock: AssetTelemetryPointView[][]):
   }
 
   const round1 = (n: number) => Math.round(n * 10) / 10;
-  const mean = (points: AssetTelemetryPointView[], key: keyof AssetTelemetryPointView) =>
-    round1(points.reduce((sum, p) => sum + (p[key] as number), 0) / points.length);
+  const mean = (
+    points: AssetTelemetryPointView[],
+    key: keyof AssetTelemetryPointView,
+  ) =>
+    round1(
+      points.reduce((sum, p) => sum + (p[key] as number), 0) / points.length,
+    );
 
   return [...byDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
