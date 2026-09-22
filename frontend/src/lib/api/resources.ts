@@ -11,7 +11,6 @@ import {
   fetchAssetTelemetry,
   fetchBatteries,
   fetchBattery,
-  fetchBatteryHealthTrend,
   fetchBatterySummary,
   fetchBatteryTelemetry,
   fetchAssets,
@@ -50,7 +49,6 @@ import {
   normalisePredictiveWarning,
   normaliseStation,
   normaliseStationDetail,
-  normaliseTrend,
   normaliseVehicle,
   normaliseVehicleDetail,
   normaliseVehicleTelemetry,
@@ -67,7 +65,6 @@ import {
   type PredictiveWarningRow,
   type StationDetailView,
   type StationRow,
-  type TrendPoint,
   type VehicleDetailView,
   type VehicleRow,
   type VehicleTelemetryPointView,
@@ -98,21 +95,17 @@ async function load<T>(fn: () => Promise<T>): Promise<Loaded<T>> {
 export interface BatteriesPageData {
   rows: BatteryRow[];
   summary: ApiBatteryCounts | null;
-  /** null when the trend endpoint fails — the panel hides itself rather than
-   * taking the whole page down over a chart. */
-  healthTrend: TrendPoint[] | null;
 }
 
-export function getBatteriesPage(days = 7): Promise<Loaded<BatteriesPageData>> {
+export function getBatteriesPage(): Promise<Loaded<BatteriesPageData>> {
   return load(async () => {
-    // The summary and trend are both a nicety for this screen — a failure in
-    // either should not take the whole table down with it.
-    const [rows, summary, trend] = await Promise.all([
+    // The summary is a nicety for the filter chips — a failure there should not
+    // take the whole table down with it.
+    const [rows, summary] = await Promise.all([
       fetchBatteries(),
       fetchBatterySummary().catch(() => null),
-      fetchBatteryHealthTrend(days).catch(() => null),
     ]);
-    return { rows: rows.map(normaliseBattery), summary, healthTrend: normaliseTrend(trend) };
+    return { rows: rows.map(normaliseBattery), summary };
   });
 }
 
