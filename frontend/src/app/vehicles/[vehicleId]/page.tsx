@@ -5,7 +5,8 @@ import { Panel } from "@/components/ui/Panel";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { RiskPill } from "@/components/ui/RiskPill";
 import { HealthBar, healthColor } from "@/components/ui/HealthBar";
-import { getVehicleDetail } from "@/lib/api/resources";
+import { TelemetryChart } from "@/components/battery/TelemetryChart";
+import { getVehicleDetail, getVehicleTelemetryPoints } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
 
@@ -44,7 +45,10 @@ export default async function VehicleDetailPage({
   params: Promise<{ vehicleId: string }>;
 }) {
   const { vehicleId } = await params;
-  const { data, error } = await getVehicleDetail(vehicleId);
+  const [{ data, error }, { data: telemetry }] = await Promise.all([
+    getVehicleDetail(vehicleId),
+    getVehicleTelemetryPoints(vehicleId, 14),
+  ]);
 
   if (error || !data) {
     return (
@@ -58,6 +62,7 @@ export default async function VehicleDetailPage({
   }
 
   const vehicle = data;
+  const telemetryRows = telemetry ?? [];
 
   const scoredLabel = vehicle.scoredAt ? formatScoredAt(vehicle.scoredAt) : "—";
 
@@ -295,6 +300,23 @@ export default async function VehicleDetailPage({
             </dl>
           </Panel>
         </div>
+
+        {telemetryRows.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="Battery Temperature" titleNote="(daily avg, °C)">
+              <TelemetryChart data={telemetryRows} dataKey="batteryTemp" color="var(--status-critical)" unit="°C" gradientId="vehicle-temp" />
+            </Panel>
+            <Panel title="Average Speed" titleNote="(daily avg, km/h)">
+              <TelemetryChart data={telemetryRows} dataKey="avgSpeed" color="var(--series-1)" unit="km/h" gradientId="vehicle-speed" />
+            </Panel>
+            <Panel title="Distance Covered" titleNote="(daily, km)">
+              <TelemetryChart data={telemetryRows} dataKey="distanceKm" color="var(--status-good)" unit="km" gradientId="vehicle-distance" />
+            </Panel>
+            <Panel title="Energy Consumption" titleNote="(daily avg, Wh/km)">
+              <TelemetryChart data={telemetryRows} dataKey="energyPerKm" color="var(--series-7)" unit="Wh/km" gradientId="vehicle-energy" />
+            </Panel>
+          </div>
+        )}
 
         {vehicle.suggestedChecks.length > 0 && (
           <Panel title="Recommended Checks">

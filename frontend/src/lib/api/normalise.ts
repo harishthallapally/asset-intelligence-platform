@@ -13,6 +13,7 @@ import type {
   ApiAsset,
   ApiAssetTelemetryPoint,
   ApiBattery,
+  ApiBatteryTelemetryPoint,
   ApiHealthDistribution,
   ApiBatteryDetail,
   ApiCharger,
@@ -27,6 +28,7 @@ import type {
   ApiStationScore,
   ApiVehicleDetail,
   ApiVehicleSummary,
+  ApiVehicleTelemetryPoint,
 } from "./types";
 
 export type DataSource = "api" | "demo";
@@ -440,6 +442,30 @@ export function normaliseBatteryDetail(
   };
 }
 
+/** GET /batteries/{id}/telemetry — a single pack's own daily trend (state of
+ * health, temperature, charging behaviour), for its Asset 360 page. */
+export interface BatteryTelemetryPointView {
+  date: string;
+  temperature: number;
+  chargingDuration: number;
+  efficiency: number;
+  stateOfHealth: number;
+  cellVoltageDelta: number;
+}
+
+export function normaliseBatteryTelemetry(
+  points: ApiBatteryTelemetryPoint[],
+): BatteryTelemetryPointView[] {
+  return points.map((p) => ({
+    date: p.date,
+    temperature: p.battery_temperature_mean ?? 0,
+    chargingDuration: p.charging_duration_mean ?? 0,
+    efficiency: p.efficiency_mean ?? 0,
+    stateOfHealth: p.soh_mean ?? 0,
+    cellVoltageDelta: p.cell_voltage_delta_mean ?? 0,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // GET /vehicles · GET /vehicles/{asset_id} — the 2W EV fleet, same registry +
 // scoring model as batteries/stations/chargers. registrationNumber is the
@@ -546,6 +572,30 @@ export function normaliseVehicleDetail(
       : null,
     batteryWarrantyStatus: detail.battery_warranty_status ?? null,
   };
+}
+
+/** GET /vehicles/{asset_id}/telemetry — a single 2W EV's own daily trend
+ * (battery temperature, speed, distance, energy use), for its Asset 360 page. */
+export interface VehicleTelemetryPointView {
+  date: string;
+  batteryTemp: number;
+  avgSpeed: number;
+  distanceKm: number;
+  energyPerKm: number;
+}
+
+export function normaliseVehicleTelemetry(
+  points: ApiVehicleTelemetryPoint[],
+): VehicleTelemetryPointView[] {
+  return points
+    .filter((p): p is ApiVehicleTelemetryPoint & { date: string } => !!p.date)
+    .map((p) => ({
+      date: p.date,
+      batteryTemp: p.battery_temperature_mean ?? 0,
+      avgSpeed: p.vehicle_speed_mean ?? 0,
+      distanceKm: p.distance_km ?? 0,
+      energyPerKm: p.energy_per_km ?? 0,
+    }));
 }
 
 export function normaliseStation(row: ApiStation): StationRow {

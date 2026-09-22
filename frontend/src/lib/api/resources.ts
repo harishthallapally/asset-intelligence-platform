@@ -11,7 +11,9 @@ import {
   fetchAssetTelemetry,
   fetchBatteries,
   fetchBattery,
+  fetchBatteryHealthTrend,
   fetchBatterySummary,
+  fetchBatteryTelemetry,
   fetchAssets,
   fetchChargerDetail,
   fetchChargers,
@@ -29,6 +31,7 @@ import {
   fetchVehicle,
   fetchVehicles,
   fetchVehicleSummary,
+  fetchVehicleTelemetry,
 } from "./client";
 import type { ApiBatteryCounts, ApiVehicleFleetSummary } from "./types";
 import {
@@ -40,18 +43,22 @@ import {
   normaliseAssetTelemetry,
   normaliseBattery,
   normaliseBatteryDetail,
+  normaliseBatteryTelemetry,
   normaliseCharger,
   normaliseChargerDetail,
   normaliseOperationsRisk,
   normalisePredictiveWarning,
   normaliseStation,
   normaliseStationDetail,
+  normaliseTrend,
   normaliseVehicle,
   normaliseVehicleDetail,
+  normaliseVehicleTelemetry,
   type AssetRow,
   type AssetTelemetryPointView,
   type BatteryDetailView,
   type BatteryRow,
+  type BatteryTelemetryPointView,
   type AlertTone,
   type ChargerDetailView,
   type ChargerRow,
@@ -60,8 +67,10 @@ import {
   type PredictiveWarningRow,
   type StationDetailView,
   type StationRow,
+  type TrendPoint,
   type VehicleDetailView,
   type VehicleRow,
+  type VehicleTelemetryPointView,
 } from "./normalise";
 
 export interface Loaded<T> {
@@ -89,17 +98,21 @@ async function load<T>(fn: () => Promise<T>): Promise<Loaded<T>> {
 export interface BatteriesPageData {
   rows: BatteryRow[];
   summary: ApiBatteryCounts | null;
+  /** null when the trend endpoint fails — the panel hides itself rather than
+   * taking the whole page down over a chart. */
+  healthTrend: TrendPoint[] | null;
 }
 
-export function getBatteriesPage(): Promise<Loaded<BatteriesPageData>> {
+export function getBatteriesPage(days = 7): Promise<Loaded<BatteriesPageData>> {
   return load(async () => {
-    // The summary is a nicety for the filter chips — a failure there should not
-    // take the whole table down with it.
-    const [rows, summary] = await Promise.all([
+    // The summary and trend are both a nicety for this screen — a failure in
+    // either should not take the whole table down with it.
+    const [rows, summary, trend] = await Promise.all([
       fetchBatteries(),
       fetchBatterySummary().catch(() => null),
+      fetchBatteryHealthTrend(days).catch(() => null),
     ]);
-    return { rows: rows.map(normaliseBattery), summary };
+    return { rows: rows.map(normaliseBattery), summary, healthTrend: normaliseTrend(trend) };
   });
 }
 
@@ -108,6 +121,17 @@ export function getBatteryDetail(
 ): Promise<Loaded<BatteryDetailView>> {
   return load(async () =>
     normaliseBatteryDetail(await fetchBattery(batteryId)),
+  );
+}
+
+/** GET /batteries/{id}/telemetry — daily trend for a single pack's own
+ * Asset 360 page (state of health, temperature, charging behaviour). */
+export function getBatteryTelemetryPoints(
+  batteryId: string,
+  days = 14,
+): Promise<Loaded<BatteryTelemetryPointView[]>> {
+  return load(async () =>
+    normaliseBatteryTelemetry(await fetchBatteryTelemetry(batteryId, days)),
   );
 }
 
@@ -130,6 +154,17 @@ export function getVehicleDetail(
   assetId: string,
 ): Promise<Loaded<VehicleDetailView>> {
   return load(async () => normaliseVehicleDetail(await fetchVehicle(assetId)));
+}
+
+/** GET /vehicles/{asset_id}/telemetry — daily trend for a single 2W EV's own
+ * Asset 360 page (battery temperature, speed, distance, energy use). */
+export function getVehicleTelemetryPoints(
+  assetId: string,
+  days = 14,
+): Promise<Loaded<VehicleTelemetryPointView[]>> {
+  return load(async () =>
+    normaliseVehicleTelemetry(await fetchVehicleTelemetry(assetId, days)),
+  );
 }
 
 /** GET /operations/risk, every dock fleet-wide — carrying a location string
@@ -210,13 +245,6 @@ export interface StationDetailData {
    * endpoint, so it's the mean of every dock at this station's own telemetry
    * (see `aggregateStationTelemetry`). Empty if the dock register or every
    * dock's telemetry call fails. */
-  telemetry: AssetTelemetryPointView[];
-}
-
-export interface VehicleDetailData {
-  vehicle: VehicleDetailView;
-  /** Home-station dock telemetry used as operational context; the platform
-   * does not expose a native vehicle telemetry-history endpoint. */
   telemetry: AssetTelemetryPointView[];
 }
 

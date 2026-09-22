@@ -220,6 +220,26 @@ export interface ApiVehicleDetail extends ApiVehicleSummary {
   battery_warranty_status?: string | null;
 }
 
+/** One row of GET /vehicles/{asset_id}/telemetry — daily aggregates for a
+ * single vehicle's own Asset 360 trend chart (battery temperature/SoC, motor,
+ * energy/range, speed and connectivity uptime). */
+export interface ApiVehicleTelemetryPoint {
+  date?: string | null;
+  battery_temperature_mean?: number | null;
+  battery_temperature_max?: number | null;
+  battery_soc_mean?: number | null;
+  motor_temperature_mean?: number | null;
+  motor_current_mean?: number | null;
+  energy_consumption_total?: number | null;
+  energy_per_km?: number | null;
+  range_full_estimate?: number | null;
+  distance_km?: number | null;
+  vehicle_speed_mean?: number | null;
+  connectivity_uptime?: number | null;
+  reading_count?: number | null;
+  error_count?: number | null;
+}
+
 // ---------------------------------------------------------------------------
 // GET /batteries · GET /batteries/risk/top · GET /batteries/{id}
 // ---------------------------------------------------------------------------
@@ -240,6 +260,22 @@ export interface ApiBatteryDetail extends ApiBattery {
 
 /** GET /batteries/summary — identical to the command-center battery block. */
 export type ApiBatterySummary = ApiBatteryCounts;
+
+/** One row of GET /batteries/{id}/telemetry — daily aggregates for a single
+ * battery's own Asset 360 trend chart. Different field set from
+ * ApiAssetTelemetryPoint (the dock's telemetry): a battery has no charger
+ * temperature or offline_rate of its own, but does have cell-balance and
+ * state-of-health, which no dock metric captures. */
+export interface ApiBatteryTelemetryPoint {
+  date: string;
+  battery_temperature_mean?: number | null;
+  charging_duration_mean?: number | null;
+  efficiency_mean?: number | null;
+  output_current_std?: number | null;
+  soh_mean?: number | null;
+  cell_voltage_delta_mean?: number | null;
+  swap_success_rate?: number | null;
+}
 
 // ---------------------------------------------------------------------------
 // GET /stations · GET /stations/summary · GET /chargers
@@ -536,9 +572,11 @@ export interface ApiPredictiveWarning {
   scored_at: string;
 }
 
-/** One row of GET /assets/{id}/telemetry — daily aggregates for a dock, the
- * only telemetry-history endpoint this platform exposes (no per-battery or
- * per-charger telemetry endpoint exists). */
+/** One row of GET /assets/{id}/telemetry — daily aggregates for a dock.
+ * Batteries and vehicles have their own telemetry-history endpoints with a
+ * different field set (see ApiBatteryTelemetryPoint / ApiVehicleTelemetryPoint);
+ * there is still no per-charger telemetry endpoint, which is why a charger's
+ * trend chart is borrowed from the dock it sits on. */
 export interface ApiAssetTelemetryPoint {
   date: string;
   charger_temperature_mean: number;

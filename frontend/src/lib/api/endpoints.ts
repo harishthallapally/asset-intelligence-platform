@@ -32,6 +32,7 @@ export const ENDPOINTS = {
   battery: (batteryId: string) => `/batteries/${id(batteryId)}`,
   batterySummary: () => "/batteries/summary",
   batteryHealthTrend: (days = 7) => `/batteries/health/trend${qs({ days })}`,
+  batteryTelemetry: (batteryId: string, days = 14) => `/batteries/${id(batteryId)}/telemetry${qs({ days })}`,
   batteriesTopRisk: (sortBy = "risk", order: "asc" | "desc" = "desc") =>
     `/batteries/risk/top${qs({ sort_by: sortBy, order })}`,
 
@@ -47,6 +48,7 @@ export const ENDPOINTS = {
     `/vehicles${qs({ classification: p.classification, risk_category: p.riskCategory })}`,
   vehicle: (assetId: string) => `/vehicles/${id(assetId)}`,
   vehicleSummary: () => "/vehicles/summary",
+  vehicleTelemetry: (assetId: string, days = 14) => `/vehicles/${id(assetId)}/telemetry${qs({ days })}`,
   vehiclesTopRisk: (sortBy = "risk", order: "asc" | "desc" = "desc") =>
     `/vehicles/risk/top${qs({ sort_by: sortBy, order })}`,
 

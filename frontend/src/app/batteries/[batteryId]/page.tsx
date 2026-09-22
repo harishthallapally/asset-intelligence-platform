@@ -6,7 +6,8 @@ import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { RiskPill } from "@/components/ui/RiskPill";
 import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
-import { getBatteryDetail } from "@/lib/api/resources";
+import { TelemetryChart } from "@/components/battery/TelemetryChart";
+import { getBatteryDetail, getBatteryTelemetryPoints } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
 
@@ -30,7 +31,10 @@ export default async function BatteryDetailPage({
   params: Promise<{ batteryId: string }>;
 }) {
   const { batteryId } = await params;
-  const { data: battery, error } = await getBatteryDetail(batteryId);
+  const [{ data: battery, error }, { data: telemetry }] = await Promise.all([
+    getBatteryDetail(batteryId),
+    getBatteryTelemetryPoints(batteryId, 14),
+  ]);
 
   if (error || !battery) {
     return (
@@ -41,6 +45,7 @@ export default async function BatteryDetailPage({
   }
 
   const scoredLabel = formatScoredAt(battery.scoredAt);
+  const telemetryRows = telemetry ?? [];
 
   return (
     <PageShell title={battery.batteryId} subtitle="Battery 360">
@@ -174,6 +179,23 @@ export default async function BatteryDetailPage({
             </dl>
           </Panel>
         </div>
+
+        {telemetryRows.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="Battery Temperature" titleNote="(daily avg, °C)">
+              <TelemetryChart data={telemetryRows} dataKey="temperature" color="var(--status-critical)" unit="°C" gradientId="battery-temp" />
+            </Panel>
+            <Panel title="State of Health" titleNote="(daily avg, %)">
+              <TelemetryChart data={telemetryRows} dataKey="stateOfHealth" color="var(--status-good)" unit="%" gradientId="battery-soh" />
+            </Panel>
+            <Panel title="Charging Efficiency" titleNote="(daily avg, %)">
+              <TelemetryChart data={telemetryRows} dataKey="efficiency" color="var(--series-1)" unit="%" gradientId="battery-efficiency" />
+            </Panel>
+            <Panel title="Charging Duration" titleNote="(daily avg, seconds)">
+              <TelemetryChart data={telemetryRows} dataKey="chargingDuration" color="var(--status-warning)" unit="s" gradientId="battery-duration" />
+            </Panel>
+          </div>
+        )}
 
         <Panel title="Recommended Field Action">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

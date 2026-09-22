@@ -10,6 +10,7 @@ import type {
   ApiBattery,
   ApiBatteryDetail,
   ApiBatterySummary,
+  ApiBatteryTelemetryPoint,
   ApiCharger,
   ApiAsset,
   ApiCommandCenter,
@@ -31,6 +32,7 @@ import type {
   ApiVehicleDetail,
   ApiVehicleFleetSummary,
   ApiVehicleSummary,
+  ApiVehicleTelemetryPoint,
 } from "./types";
 
 // The service is deployed on a platform that cold-starts, so first requests can
@@ -148,6 +150,12 @@ export const fetchBattery = cache(
     getJson<ApiBatteryDetail>(ENDPOINTS.battery(batteryId)),
 );
 
+/** Daily per-battery aggregates for a pack's own Asset 360 trend chart. */
+export const fetchBatteryTelemetry = cache(
+  (batteryId: string, days = 14): Promise<ApiBatteryTelemetryPoint[]> =>
+    getJson<ApiBatteryTelemetryPoint[]>(ENDPOINTS.batteryTelemetry(batteryId, days)),
+);
+
 export const fetchTopRiskBatteries = cache(
   (
   sortBy = "risk",
@@ -203,6 +211,12 @@ export const fetchVehicleSummary = cache(
 
 export const fetchVehicle = cache(
   (assetId: string): Promise<ApiVehicleDetail> => getJson<ApiVehicleDetail>(ENDPOINTS.vehicle(assetId)),
+);
+
+/** Daily per-vehicle aggregates for a 2W EV's own Asset 360 trend chart. */
+export const fetchVehicleTelemetry = cache(
+  (assetId: string, days = 14): Promise<ApiVehicleTelemetryPoint[]> =>
+    getJson<ApiVehicleTelemetryPoint[]>(ENDPOINTS.vehicleTelemetry(assetId, days)),
 );
 
 export const fetchHealthDistribution = cache(
