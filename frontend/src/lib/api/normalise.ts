@@ -298,6 +298,9 @@ export interface BatteryDetailView extends BatteryRow {
   suggestedChecks: string[];
   riskNote: string;
   scoredAt: string;
+  /** Non-telemetry findings — same shape and meaning as a station's. Empty
+   * when none apply. */
+  aiInsights: AIInsightView[];
 }
 
 export interface StationRow {
@@ -439,6 +442,9 @@ export function normaliseBatteryDetail(
     suggestedChecks: detail.suggested_checks ?? [],
     riskNote: detail.risk_note,
     scoredAt: detail.scored_at,
+    aiInsights: (detail.ai_insights ?? [])
+      .filter((insight) => insight.category !== "telemetry_risk")
+      .map(normaliseAIInsight),
   };
 }
 
@@ -516,6 +522,9 @@ export interface VehicleDetailView extends VehicleRow {
   riskNote: string | null;
   batteryWarranty: BatteryWarrantyView | null;
   batteryWarrantyStatus: string | null;
+  /** Non-telemetry findings — same shape and meaning as a station's. Empty
+   * when none apply. */
+  aiInsights: AIInsightView[];
 }
 
 export function normaliseVehicle(row: ApiVehicleSummary): VehicleRow {
@@ -571,6 +580,9 @@ export function normaliseVehicleDetail(
         }
       : null,
     batteryWarrantyStatus: detail.battery_warranty_status ?? null,
+    aiInsights: (detail.ai_insights ?? [])
+      .filter((insight) => insight.category !== "telemetry_risk")
+      .map(normaliseAIInsight),
   };
 }
 
@@ -736,6 +748,9 @@ export interface ChargerDetailView {
   suggestedChecks: string[];
   riskNote: string;
   currentBattery: ChargerCurrentBatteryView | null;
+  /** Non-telemetry findings — same shape and meaning as a station's. Empty
+   * when none apply. */
+  aiInsights: AIInsightView[];
 }
 
 export function normaliseChargerDetail(
@@ -782,6 +797,9 @@ export function normaliseChargerDetail(
           healthClassification: detail.current_battery.health_classification,
         }
       : null,
+    aiInsights: (detail.ai_insights ?? [])
+      .filter((insight) => insight.category !== "telemetry_risk")
+      .map(normaliseAIInsight),
   };
 }
 

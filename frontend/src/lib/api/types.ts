@@ -218,6 +218,9 @@ export interface ApiVehicleDetail extends ApiVehicleSummary {
   risk_note?: string | null;
   battery_warranty?: ApiVehicleBatteryWarranty | null;
   battery_warranty_status?: string | null;
+  /** Non-telemetry findings — same shape and meaning as a station's (incident
+   * history, firmware risk, etc.). Empty when none apply. */
+  ai_insights?: ApiAIInsight[];
 }
 
 /** One row of GET /vehicles/{asset_id}/telemetry — daily aggregates for a
@@ -256,6 +259,9 @@ export interface ApiBatteryDetail extends ApiBattery {
   suggested_checks: string[];
   risk_note: string;
   scored_at: string;
+  /** Non-telemetry findings — same shape and meaning as a station's (incident
+   * history, firmware risk, etc.). Empty when none apply. */
+  ai_insights?: ApiAIInsight[];
 }
 
 /** GET /batteries/summary — identical to the command-center battery block. */
@@ -492,6 +498,9 @@ export interface ApiChargerDetail {
   suggested_checks: string[];
   risk_note: string;
   current_battery: ApiChargerCurrentBattery | null;
+  /** Non-telemetry findings — same shape and meaning as a station's (incident
+   * history, firmware risk, etc.). Empty when none apply. */
+  ai_insights?: ApiAIInsight[];
 }
 
 // ---------------------------------------------------------------------------

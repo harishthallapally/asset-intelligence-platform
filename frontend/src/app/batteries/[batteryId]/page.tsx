@@ -177,6 +177,38 @@ export default async function BatteryDetailPage({
                 <dd className="font-medium text-text-secondary">{scoredLabel}</dd>
               </div>
             </dl>
+
+            {/* Non-telemetry findings (GET /batteries/{id}'s ai_insights) —
+                incident history, firmware risk, etc. Just the headline here —
+                detail and recommended_action are dropped since the checks
+                below in Recommended Field Action already cover that ground. */}
+            {battery.aiInsights.length > 0 && (
+              <ul className="mt-4 space-y-2.5 border-t border-[var(--border-hairline)] pt-3">
+                {battery.aiInsights.map((insight, index) => (
+                  <li key={`${insight.category}-${index}`}>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
+                        {label(insight.category)}
+                      </span>
+                      {insight.contributesUplift && (
+                        <span
+                          className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide"
+                          style={{ backgroundColor: "var(--status-critical-bg)", color: "var(--status-critical)" }}
+                        >
+                          Raised risk
+                        </span>
+                      )}
+                    </div>
+                    <p
+                      className="mt-1 text-[12.5px] font-medium leading-relaxed"
+                      style={{ color: insight.contributesUplift ? "var(--status-critical)" : "var(--text-secondary)" }}
+                    >
+                      {insight.headline}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
         </div>
 
