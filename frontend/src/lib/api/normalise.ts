@@ -301,6 +301,7 @@ export interface BatteryDetailView extends BatteryRow {
   /** Non-telemetry findings — same shape and meaning as a station's. Empty
    * when none apply. */
   aiInsights: AIInsightView[];
+  equipment: EquipmentView;
 }
 
 export interface StationRow {
@@ -407,6 +408,30 @@ function dimensionLabel(key: string): string {
   return key.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Equipment facts shared by every "unit" asset type's detail (battery,
+ * vehicle, charger) — stations carry none of these, being a location rather
+ * than a single manufactured unit. */
+export interface EquipmentView {
+  firmwareVersion: string | null;
+  manufactureDate: string | null;
+  warrantyMonths: number | null;
+  warrantyStatus: string | null;
+}
+
+function normaliseEquipment(detail: {
+  firmware_version?: string | null;
+  manufacture_date?: string | null;
+  warranty_months?: number | null;
+  warranty_status?: string | null;
+}): EquipmentView {
+  return {
+    firmwareVersion: detail.firmware_version ?? null,
+    manufactureDate: detail.manufacture_date ?? null,
+    warrantyMonths: detail.warranty_months ?? null,
+    warrantyStatus: detail.warranty_status ?? null,
+  };
+}
+
 export function normaliseBattery(row: ApiBattery): BatteryRow {
   return {
     batteryId: row.battery_id,
@@ -445,6 +470,7 @@ export function normaliseBatteryDetail(
     aiInsights: (detail.ai_insights ?? [])
       .filter((insight) => insight.category !== "telemetry_risk")
       .map(normaliseAIInsight),
+    equipment: normaliseEquipment(detail),
   };
 }
 
@@ -525,6 +551,7 @@ export interface VehicleDetailView extends VehicleRow {
   /** Non-telemetry findings — same shape and meaning as a station's. Empty
    * when none apply. */
   aiInsights: AIInsightView[];
+  equipment: EquipmentView;
 }
 
 export function normaliseVehicle(row: ApiVehicleSummary): VehicleRow {
@@ -583,6 +610,7 @@ export function normaliseVehicleDetail(
     aiInsights: (detail.ai_insights ?? [])
       .filter((insight) => insight.category !== "telemetry_risk")
       .map(normaliseAIInsight),
+    equipment: normaliseEquipment(detail),
   };
 }
 
@@ -751,6 +779,7 @@ export interface ChargerDetailView {
   /** Non-telemetry findings — same shape and meaning as a station's. Empty
    * when none apply. */
   aiInsights: AIInsightView[];
+  equipment: EquipmentView;
 }
 
 export function normaliseChargerDetail(
@@ -800,6 +829,7 @@ export function normaliseChargerDetail(
     aiInsights: (detail.ai_insights ?? [])
       .filter((insight) => insight.category !== "telemetry_risk")
       .map(normaliseAIInsight),
+    equipment: normaliseEquipment(detail),
   };
 }
 

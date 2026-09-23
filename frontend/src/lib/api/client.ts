@@ -213,6 +213,15 @@ export const fetchVehicle = cache(
   (assetId: string): Promise<ApiVehicleDetail> => getJson<ApiVehicleDetail>(ENDPOINTS.vehicle(assetId)),
 );
 
+/** GET /vehicles/risk/top — the platform's own risk-ranked vehicle list.
+ * /operations/risk has no vehicle support (asset_type is restricted to
+ * BATTERY/CHARGER/DOCK/STATION), so this is the only source for a vehicle's
+ * own top-risk ranking. */
+export const fetchTopRiskVehicles = cache(
+  (sortBy = "risk", order: "asc" | "desc" = "desc", limit?: number): Promise<ApiVehicleSummary[]> =>
+    getJson<ApiVehicleSummary[]>(ENDPOINTS.vehiclesTopRisk(sortBy, order, limit)),
+);
+
 /** Daily per-vehicle aggregates for a 2W EV's own Asset 360 trend chart. */
 export const fetchVehicleTelemetry = cache(
   (assetId: string, days = 14): Promise<ApiVehicleTelemetryPoint[]> =>

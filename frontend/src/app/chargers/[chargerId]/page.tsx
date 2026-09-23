@@ -8,6 +8,7 @@ import { RiskPill } from "@/components/ui/RiskPill";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
+import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { getChargerDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
@@ -17,6 +18,12 @@ function label(value: string): string {
     .replace(/[_-]+/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-IN", { dateStyle: "medium" });
 }
 
 /** The service sends `last_seen: null` for chargers that have never reported;
@@ -55,13 +62,27 @@ export default async function ChargerDetailPage({
   return (
     <PageShell title={`${charger.stationId} · ${charger.chargerId}`} subtitle={`Dock ${charger.dockId}`}>
       <div className="flex flex-col gap-4">
-        <Link
-          href="/chargers"
-          className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
-        >
-          <ArrowLeft size={14} />
-          All chargers
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/chargers"
+            className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
+          >
+            <ArrowLeft size={14} />
+            All chargers
+          </Link>
+          {scoring && (scoring.equipment.firmwareVersion || scoring.equipment.manufactureDate) && (
+            <div className="flex items-center gap-2">
+              {scoring.equipment.firmwareVersion && (
+                <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
+                  v{scoring.equipment.firmwareVersion}
+                </span>
+              )}
+              {scoring.equipment.manufactureDate && (
+                <span className="text-[11px] text-text-muted">Mfg {formatDate(scoring.equipment.manufactureDate)}</span>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Panel>
@@ -390,7 +411,12 @@ export default async function ChargerDetailPage({
                   <p className="mt-2 text-[13px] text-text-muted">No checks suggested.</p>
                 )}
               </div>
-              <CreateFieldActionButton batteryId={charger.chargerId} sla={scoring.sla} priority={scoring.priority} />
+              <div className="flex flex-none items-center gap-2">
+                <ShareOnWhatsAppButton
+                  message={`Charger ${charger.stationId} ${charger.chargerId} — ${scoring.priority} priority, SLA ${scoring.sla}. ${scoring.likelyIssue}`}
+                />
+                <CreateFieldActionButton batteryId={charger.chargerId} sla={scoring.sla} priority={scoring.priority} />
+              </div>
             </div>
           </Panel>
         )}

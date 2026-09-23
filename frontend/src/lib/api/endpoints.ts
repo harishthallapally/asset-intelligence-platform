@@ -49,8 +49,8 @@ export const ENDPOINTS = {
   vehicle: (assetId: string) => `/vehicles/${id(assetId)}`,
   vehicleSummary: () => "/vehicles/summary",
   vehicleTelemetry: (assetId: string, days = 14) => `/vehicles/${id(assetId)}/telemetry${qs({ days })}`,
-  vehiclesTopRisk: (sortBy = "risk", order: "asc" | "desc" = "desc") =>
-    `/vehicles/risk/top${qs({ sort_by: sortBy, order })}`,
+  vehiclesTopRisk: (sortBy = "risk", order: "asc" | "desc" = "desc", limit?: number) =>
+    `/vehicles/risk/top${qs({ sort_by: sortBy, order, limit })}`,
 
   // --- Stations & chargers ---
   stations: () => "/stations",

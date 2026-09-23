@@ -221,6 +221,12 @@ export interface ApiVehicleDetail extends ApiVehicleSummary {
   /** Non-telemetry findings — same shape and meaning as a station's (incident
    * history, firmware risk, etc.). Empty when none apply. */
   ai_insights?: ApiAIInsight[];
+  /** Equipment facts for the vehicle itself — separate from battery_warranty
+   * above, which covers the fitted battery pack specifically. */
+  firmware_version?: string | null;
+  manufacture_date?: string | null;
+  warranty_months?: number | null;
+  warranty_status?: string | null;
 }
 
 /** One row of GET /vehicles/{asset_id}/telemetry — daily aggregates for a
@@ -262,6 +268,13 @@ export interface ApiBatteryDetail extends ApiBattery {
   /** Non-telemetry findings — same shape and meaning as a station's (incident
    * history, firmware risk, etc.). Empty when none apply. */
   ai_insights?: ApiAIInsight[];
+  /** Equipment facts — same fields on every "unit" asset type (battery,
+   * vehicle, charger); stations have none of these, being a location rather
+   * than a single manufactured unit. */
+  firmware_version?: string | null;
+  manufacture_date?: string | null;
+  warranty_months?: number | null;
+  warranty_status?: string | null;
 }
 
 /** GET /batteries/summary — identical to the command-center battery block. */
@@ -501,6 +514,11 @@ export interface ApiChargerDetail {
   /** Non-telemetry findings — same shape and meaning as a station's (incident
    * history, firmware risk, etc.). Empty when none apply. */
   ai_insights?: ApiAIInsight[];
+  /** Equipment facts — same fields as a battery's or vehicle's detail. */
+  firmware_version?: string | null;
+  manufacture_date?: string | null;
+  warranty_months?: number | null;
+  warranty_status?: string | null;
 }
 
 // ---------------------------------------------------------------------------

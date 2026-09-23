@@ -5,6 +5,8 @@ import { Panel } from "@/components/ui/Panel";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { RiskPill } from "@/components/ui/RiskPill";
 import { HealthBar, healthColor } from "@/components/ui/HealthBar";
+import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
+import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { getVehicleDetail, getVehicleTelemetryPoints } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
@@ -69,13 +71,25 @@ export default async function VehicleDetailPage({
   return (
     <PageShell title={vehicle.assetId} subtitle="Vehicle 360">
       <div className="flex flex-col gap-4">
-        <Link
-          href="/vehicles"
-          className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
-        >
-          <ArrowLeft size={14} />
-          All vehicles
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/vehicles"
+            className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
+          >
+            <ArrowLeft size={14} />
+            All vehicles
+          </Link>
+          <div className="flex items-center gap-2">
+            {vehicle.equipment.firmwareVersion && (
+              <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
+                v{vehicle.equipment.firmwareVersion}
+              </span>
+            )}
+            {vehicle.equipment.manufactureDate && (
+              <span className="text-[11px] text-text-muted">Mfg {formatDate(vehicle.equipment.manufactureDate)}</span>
+            )}
+          </div>
+        </div>
 
         <Panel>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
@@ -350,15 +364,37 @@ export default async function VehicleDetailPage({
           </div>
         )}
 
-        {vehicle.suggestedChecks.length > 0 && (
-          <Panel title="Recommended Checks">
-            <ol className="ml-4 list-decimal space-y-1 text-[13px] text-text-secondary">
-              {vehicle.suggestedChecks.map((check) => (
-                <li key={check}>{check}</li>
-              ))}
-            </ol>
-          </Panel>
-        )}
+        <Panel title="Recommended Field Action">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[13px] text-text-secondary">
+                <span className="font-semibold text-text-primary">{vehicle.priority ?? "P4"}</span> ·{" "}
+                {vehicle.sla ?? "Routine"} · {vehicle.likelyIssue ?? "No significant risk identified"}
+              </p>
+              {vehicle.suggestedChecks.length > 0 ? (
+                <ol className="mt-3 ml-4 list-decimal space-y-1 text-[13px] text-text-secondary">
+                  {vehicle.suggestedChecks.map((check) => (
+                    <li key={check}>{check}</li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-2 text-[13px] text-text-muted">No checks suggested.</p>
+              )}
+            </div>
+            <div className="flex flex-none items-center gap-2">
+              <ShareOnWhatsAppButton
+                message={`Vehicle ${vehicle.assetId} — ${vehicle.priority ?? "P4"} priority, SLA ${
+                  vehicle.sla ?? "Routine"
+                }. ${vehicle.likelyIssue ?? "No significant risk identified"}`}
+              />
+              <CreateFieldActionButton
+                batteryId={vehicle.assetId}
+                sla={vehicle.sla ?? "Routine"}
+                priority={vehicle.priority ?? "P4"}
+              />
+            </div>
+          </div>
+        </Panel>
       </div>
     </PageShell>
   );

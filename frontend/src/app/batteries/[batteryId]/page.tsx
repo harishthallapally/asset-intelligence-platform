@@ -6,6 +6,7 @@ import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { RiskPill } from "@/components/ui/RiskPill";
 import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
+import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { getBatteryDetail, getBatteryTelemetryPoints } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
@@ -23,6 +24,12 @@ function label(value: string): string {
     .replace(/[_-]+/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-IN", { dateStyle: "medium" });
 }
 
 export default async function BatteryDetailPage({
@@ -50,13 +57,25 @@ export default async function BatteryDetailPage({
   return (
     <PageShell title={battery.batteryId} subtitle="Battery 360">
       <div className="flex flex-col gap-4">
-        <Link
-          href="/batteries"
-          className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
-        >
-          <ArrowLeft size={14} />
-          All batteries
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/batteries"
+            className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
+          >
+            <ArrowLeft size={14} />
+            All batteries
+          </Link>
+          <div className="flex items-center gap-2">
+            {battery.equipment.firmwareVersion && (
+              <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
+                v{battery.equipment.firmwareVersion}
+              </span>
+            )}
+            {battery.equipment.manufactureDate && (
+              <span className="text-[11px] text-text-muted">Mfg {formatDate(battery.equipment.manufactureDate)}</span>
+            )}
+          </div>
+        </div>
 
         <Panel>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
@@ -246,7 +265,12 @@ export default async function BatteryDetailPage({
                 <p className="mt-2 text-[13px] text-text-muted">No checks suggested.</p>
               )}
             </div>
-            <CreateFieldActionButton batteryId={battery.batteryId} sla={battery.sla} priority={battery.priority} />
+            <div className="flex flex-none items-center gap-2">
+              <ShareOnWhatsAppButton
+                message={`Battery ${battery.batteryId} — ${battery.priority} priority, SLA ${battery.sla}. ${battery.likelyIssue}`}
+              />
+              <CreateFieldActionButton batteryId={battery.batteryId} sla={battery.sla} priority={battery.priority} />
+            </div>
           </div>
         </Panel>
 

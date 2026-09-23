@@ -9,6 +9,7 @@ import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { RiskPill } from "@/components/ui/RiskPill";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
+import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { getStationDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { healthConditionColor, riskWarningColor } from "@/lib/riskColor";
@@ -298,7 +299,12 @@ export default async function StationDetailPage({
                   <p className="mt-2 text-[13px] text-text-muted">No checks suggested.</p>
                 )}
               </div>
-              <CreateFieldActionButton batteryId={station.stationId} sla={scoring.sla} priority={scoring.priority} />
+              <div className="flex flex-none items-center gap-2">
+                <ShareOnWhatsAppButton
+                  message={`Station ${station.stationId} — ${scoring.priority} priority, SLA ${scoring.sla}. ${scoring.likelyIssue}`}
+                />
+                <CreateFieldActionButton batteryId={station.stationId} sla={scoring.sla} priority={scoring.priority} />
+              </div>
             </div>
           </Panel>
         )}

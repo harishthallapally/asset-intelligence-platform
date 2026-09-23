@@ -8,6 +8,7 @@ import {
   INDIA_VIEW_H,
   INDIA_VIEW_W,
 } from "./indiaOutline";
+import { KIND_STYLE, type AssetKind } from "./TopRiskAssets";
 
 export interface MapMarker {
   stationId: string;
@@ -20,6 +21,20 @@ export interface MapMarker {
   riskScore: number | null;
   riskCategory: string | null;
   avgHealthScore: number;
+}
+
+/** A single non-station asset (battery, vehicle, charger or dock) plotted on
+ * the network map with an icon matching its type — same icon/colour set the
+ * dashboard's own Top Risk Assets list uses, so the two never disagree. */
+export interface MapAssetMarker {
+  id: string;
+  kind: AssetKind;
+  href: string;
+  lat: number;
+  lng: number;
+  riskScore: number | null;
+  riskCategory: string | null;
+  issue: string | null;
 }
 
 export interface MapCityLabel {
@@ -50,6 +65,12 @@ function markerColor(marker: MapMarker): string {
   return "var(--status-good)";
 }
 
+function assetRiskColor(riskCategory: string | null): string {
+  if (riskCategory === "CRITICAL" || riskCategory === "HIGH") return "var(--status-critical)";
+  if (riskCategory === "MODERATE") return "var(--status-warning)";
+  return "var(--status-good)";
+}
+
 export const MAP_LEGEND = [
   { label: "Low risk", color: "var(--status-good)" },
   { label: "Moderate risk", color: "var(--status-warning)" },
@@ -57,7 +78,17 @@ export const MAP_LEGEND = [
   { label: "Station offline", color: "var(--text-muted)" },
 ];
 
-export function NetworkMap({ stations, cityLabels }: { stations: MapMarker[]; cityLabels: MapCityLabel[] }) {
+export function NetworkMap({
+  stations,
+  assets = [],
+  cityLabels,
+}: {
+  stations: MapMarker[];
+  /** Top-risk assets (battery/vehicle/charger/dock), one icon marker each —
+   * rendered on top of the plain station dots so they stand out. */
+  assets?: MapAssetMarker[];
+  cityLabels: MapCityLabel[];
+}) {
   return (
     <div
       className="relative mx-auto w-full max-w-[520px] overflow-hidden rounded-lg"
@@ -100,6 +131,39 @@ export function NetworkMap({ stations, cityLabels }: { stations: MapMarker[]; ci
               className="block h-2 w-2 rounded-full ring-1 ring-white/80 transition-transform hover:scale-[2]"
               style={{ backgroundColor: color, boxShadow: "0 1px 2px rgba(0,0,0,0.25)" }}
             />
+          </Link>
+        );
+      })}
+
+      {/* One marker per category (battery/vehicle/charger/station), each its
+          own current worst instance — rendered above the plain station dots,
+          with a soft radar-style pulse so the four are easy to spot at a
+          glance rather than blending into the dot field. */}
+      {assets.map((asset) => {
+        const { x, y } = project(asset.lat, asset.lng);
+        const style = KIND_STYLE[asset.kind];
+        const Icon = style.icon;
+        const color = assetRiskColor(asset.riskCategory);
+        return (
+          <Link
+            key={`${asset.kind}-${asset.id}`}
+            href={asset.href}
+            title={`${style.label} ${asset.id}${asset.issue ? ` · ${asset.issue}` : ""}${
+              asset.riskScore !== null ? ` · ${Math.round(asset.riskScore)}% risk` : ""
+            }`}
+            className="group absolute z-20 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${x}%`, top: `${y}%` }}
+          >
+            <span
+              className="absolute inset-0 -z-10 animate-ping rounded-full opacity-40"
+              style={{ backgroundColor: color }}
+            />
+            <span
+              className="flex h-6 w-6 items-center justify-center rounded-full ring-2 ring-white transition-transform group-hover:scale-125"
+              style={{ backgroundColor: color, boxShadow: "0 2px 5px rgba(0,0,0,0.4)" }}
+            >
+              <Icon size={13} className="text-white" strokeWidth={2.5} />
+            </span>
           </Link>
         );
       })}

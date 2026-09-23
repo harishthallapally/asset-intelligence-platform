@@ -27,6 +27,7 @@ import {
   fetchStations,
   fetchStationScores,
   fetchStationsSummary,
+  fetchTopRiskVehicles,
   fetchVehicle,
   fetchVehicles,
   fetchVehicleSummary,
@@ -199,6 +200,45 @@ export async function getTopRiskAssets(
   } catch {
     return [];
   }
+}
+
+/** The single highest-risk asset of each of battery/charger/vehicle — three
+ * of the Map View's four category markers (the fourth, station, comes from
+ * the already-loaded full station register instead of a fifth fetch, since
+ * that data is already on the page and more authoritative — composite,
+ * insight-aware scoring). GET /operations/risk covers battery/charger
+ * (asset_type is restricted to BATTERY/CHARGER/DOCK/STATION; it 400s on
+ * VEHICLE), so the vehicle entry comes from its own GET /vehicles/risk/top
+ * instead — the only endpoint that covers it. Each of the three fetches
+ * degrades on its own; a category with no data just contributes no marker. */
+export async function getTopAssetPerCategory(): Promise<OperationsRiskRow[]> {
+  const [battery, charger, vehicles] = await Promise.all([
+    fetchOperationsRisk({ assetType: "BATTERY", sortBy: "risk", order: "desc", limit: 1 }).catch(() => []),
+    fetchOperationsRisk({ assetType: "CHARGER", sortBy: "risk", order: "desc", limit: 1 }).catch(() => []),
+    fetchTopRiskVehicles("risk", "desc", 1).catch(() => []),
+  ]);
+
+  const rows = [...battery, ...charger].map(normaliseOperationsRisk);
+
+  const topVehicle = vehicles[0];
+  if (topVehicle) {
+    rows.push({
+      assetType: "VEHICLE",
+      assetId: topVehicle.asset_id,
+      stationId: topVehicle.home_station_id ?? null,
+      dockId: null,
+      location: topVehicle.location ?? null,
+      riskScore: topVehicle.risk_score ?? 0,
+      riskCategoryRaw: topVehicle.risk_category ?? "LOW",
+      likelyIssue: topVehicle.likely_issue ?? null,
+      businessImpact: null,
+      priority: topVehicle.priority ?? "P4",
+      predictionWindow: topVehicle.prediction_window ?? null,
+      scoredAt: topVehicle.scored_at ?? null,
+    });
+  }
+
+  return rows;
 }
 
 export interface StationsPageData {

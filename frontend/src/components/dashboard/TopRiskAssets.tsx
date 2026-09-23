@@ -16,7 +16,10 @@ export interface RankedAsset {
   tag: string;
 }
 
-const KIND_STYLE: Record<AssetKind, { icon: typeof Plug; label: string; color: string; bg: string }> = {
+// Exported so other views that plot assets by type — the Map View's markers,
+// for instance — use the exact same icon/colour per kind rather than a
+// second, potentially drifting mapping.
+export const KIND_STYLE: Record<AssetKind, { icon: typeof Plug; label: string; color: string; bg: string }> = {
   battery: {
     icon: BatteryCharging,
     label: "Battery",
