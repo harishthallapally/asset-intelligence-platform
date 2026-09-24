@@ -14,6 +14,29 @@ and what the field team should do.
 
 ---
 
+## Tech stack
+
+The `frontend/` app is what's deployed; `backend/` is a reference implementation
+only (see below).
+
+| Layer | Choice |
+|---|---|
+| Framework | [Next.js 16](https://nextjs.org) — App Router, React Server Components, Turbopack for both `dev` and `build` |
+| UI library | [React 19](https://react.dev) |
+| Language | TypeScript 5, strict mode |
+| Styling | [Tailwind CSS 4](https://tailwindcss.com) |
+| Charts | [Recharts](https://recharts.org) — trend lines, donuts, telemetry charts (the network map itself is a hand-drawn inline SVG, not a charting library) |
+| Icons | [lucide-react](https://lucide.dev) |
+| Lint | ESLint 9 with `eslint-config-next` |
+| Hosting | [Vercel](https://vercel.com) (see *Deploying to Vercel* below) |
+
+No state-management library, no CSS-in-JS, no ORM/database — screens are
+server components that read the platform API directly (see below) and hand
+already-shaped view models to a thin client-side layer for interactivity
+(tables, the copilot widget, demo controls).
+
+---
+
 ## Quick start
 
 **Requirements:** Node.js 20.9+ (tested on 22.17) and npm.
@@ -138,6 +161,45 @@ frontend/src/
     └── mock/             synthetic dataset used only as a fallback
 ```
 
+### How the frontend connects to the backend
+
+The dashboard holds no database and does no scoring of its own — it is a
+thin, read-mostly client of the hosted platform API. The connection is a
+single environment variable and one call chain, always in this direction:
+
+```
+Screen (Server Component)
+  → lib/api/resources.ts   (per-screen loader — what data this page needs)
+    → lib/api/client.ts    (typed fetch, one function per endpoint)
+      → lib/api/endpoints.ts (builds the URL + query string)
+        → API_BASE_URL + path, over HTTPS, plain JSON
+      ← lib/api/types.ts   (wire types — snake_case, matches the response exactly)
+    ← lib/api/normalise.ts (wire types → the camelCase view model the screen renders)
+```
+
+- **`API_BASE_URL`** (set in `frontend/.env.local`, or as a Vercel env var) is
+  the only address configured anywhere. It is deliberately **not** prefixed
+  `NEXT_PUBLIC_`, so it is read only on the server (`process.env` inside a
+  Server Component / API route) and never shipped to the browser — the
+  client never talks to the platform API directly.
+- Screens never call `fetch` themselves; every request goes through
+  `lib/api/client.ts`, which adds a timeout, tags the response for caching,
+  and turns a failed/unreachable call into a typed `ApiUnavailableError`
+  rather than an unhandled exception.
+- Responses are cached for 30 seconds via Next's `fetch` cache (`revalidate:
+  30`, tagged `platform-data`) — a dashboard load that touches five slow
+  endpoints still stays fast. Demo-control mutations call `revalidateTag`
+  immediately after, so you always see the result of your own write instead
+  of a stale cached read.
+- If `API_BASE_URL` is unset, or the platform API is unreachable, screens
+  fall back to the local synthetic dataset in `lib/mock/` and show a
+  **"Showing sample data"** banner — the dashboard never silently passes
+  fabricated numbers off as live ones.
+- The **AI Copilot** doesn't fetch from the browser either: the widget posts
+  to this app's own `app/api/copilot/route.ts`, a Next.js API route that
+  calls the platform's `/copilot/ask` server-side — same reasoning, the
+  platform's address (and any future credential) stays off the client.
+
 ### The API layer
 
 | File | Role |
@@ -148,10 +210,6 @@ frontend/src/
 | `api/normalise.ts` | Wire types → the view models screens consume |
 | `api/resources.ts` | Per-screen loaders |
 | `api/scenarios.ts` | Rolls raw failure signals into the four spec scenarios |
-
-Screens never call `fetch` directly. Responses are cached for 30 seconds and
-tagged, so a dashboard load that touches five slow endpoints stays fast; demo
-mutations expire the tag immediately so you always see your own writes.
 
 ### Health vs. risk
 
