@@ -54,7 +54,7 @@ export default async function VehicleDetailPage({
 
   if (error || !data) {
     return (
-      <PageShell title={vehicleId} subtitle="Vehicle 360">
+      <PageShell title={vehicleId} subtitle="">
         <ApiErrorState
           title={`Could not load ${vehicleId}`}
           error={error ?? "Unknown error"}
@@ -67,29 +67,18 @@ export default async function VehicleDetailPage({
   const telemetryRows = telemetry ?? [];
 
   const scoredLabel = vehicle.scoredAt ? formatScoredAt(vehicle.scoredAt) : "—";
+  const subtitle = vehicle.equipment.firmwareVersion ? `v${vehicle.equipment.firmwareVersion}` : "";
 
   return (
-    <PageShell title={vehicle.assetId} subtitle="Vehicle 360">
+    <PageShell title={vehicle.assetId} subtitle={subtitle}>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/vehicles"
-            className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
-          >
-            <ArrowLeft size={14} />
-            All vehicles
-          </Link>
-          <div className="flex items-center gap-2">
-            {vehicle.equipment.firmwareVersion && (
-              <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
-                v{vehicle.equipment.firmwareVersion}
-              </span>
-            )}
-            {vehicle.equipment.manufactureDate && (
-              <span className="text-[11px] text-text-muted">Mfg {formatDate(vehicle.equipment.manufactureDate)}</span>
-            )}
-          </div>
-        </div>
+        <Link
+          href="/vehicles"
+          className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
+        >
+          <ArrowLeft size={14} />
+          All vehicles
+        </Link>
 
         <Panel>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
@@ -161,65 +150,77 @@ export default async function VehicleDetailPage({
           </div>
         </Panel>
 
-        {vehicle.batteryWarranty && (
+        {(vehicle.batteryWarranty || vehicle.equipment.manufactureDate) && (
           <Panel title="Battery Warranty">
             <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
-              <div>
-                <div className="text-[12px] text-text-muted">Status</div>
-                <div
-                  className="mt-1 text-[15px] font-semibold"
-                  style={{
-                    color: vehicle.batteryWarranty.status
-                      ? (WARRANTY_TONE[
-                          vehicle.batteryWarranty.status.toUpperCase()
-                        ] ?? "var(--text-primary)")
-                      : "var(--text-primary)",
-                  }}
-                >
-                  {label(vehicle.batteryWarranty.status)}
+              {vehicle.equipment.manufactureDate && (
+                <div>
+                  <div className="text-[12px] text-text-muted">Vehicle Manufactured</div>
+                  <div className="mt-1 text-[15px] font-semibold text-text-primary">
+                    {formatDate(vehicle.equipment.manufactureDate)}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-text-muted">
-                  Limiting Factor
-                </div>
-                <div className="mt-1 text-[15px] font-semibold text-text-primary">
-                  {label(vehicle.batteryWarranty.limitingFactor)}
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-text-muted">
-                  Days Remaining
-                </div>
-                <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
-                  {vehicle.batteryWarranty.daysRemaining ?? "—"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-text-muted">
-                  Distance Remaining
-                </div>
-                <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
-                  {vehicle.batteryWarranty.distanceRemainingKm != null
-                    ? `${vehicle.batteryWarranty.distanceRemainingKm.toLocaleString("en-IN")} km`
-                    : "—"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-text-muted">Odometer</div>
-                <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
-                  {vehicle.batteryWarranty.odometerKm != null
-                    ? `${vehicle.batteryWarranty.odometerKm.toLocaleString("en-IN")} km`
-                    : "—"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-text-muted">Coverage</div>
-                <div className="mt-1 text-[13px] font-medium text-text-primary">
-                  {formatDate(vehicle.batteryWarranty.start)} –{" "}
-                  {formatDate(vehicle.batteryWarranty.end)}
-                </div>
-              </div>
+              )}
+              {vehicle.batteryWarranty && (
+                <>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Status</div>
+                    <div
+                      className="mt-1 text-[15px] font-semibold"
+                      style={{
+                        color: vehicle.batteryWarranty.status
+                          ? (WARRANTY_TONE[
+                              vehicle.batteryWarranty.status.toUpperCase()
+                            ] ?? "var(--text-primary)")
+                          : "var(--text-primary)",
+                      }}
+                    >
+                      {label(vehicle.batteryWarranty.status)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">
+                      Limiting Factor
+                    </div>
+                    <div className="mt-1 text-[15px] font-semibold text-text-primary">
+                      {label(vehicle.batteryWarranty.limitingFactor)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">
+                      Days Remaining
+                    </div>
+                    <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                      {vehicle.batteryWarranty.daysRemaining ?? "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">
+                      Distance Remaining
+                    </div>
+                    <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                      {vehicle.batteryWarranty.distanceRemainingKm != null
+                        ? `${vehicle.batteryWarranty.distanceRemainingKm.toLocaleString("en-IN")} km`
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Odometer</div>
+                    <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                      {vehicle.batteryWarranty.odometerKm != null
+                        ? `${vehicle.batteryWarranty.odometerKm.toLocaleString("en-IN")} km`
+                        : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Coverage</div>
+                    <div className="mt-1 text-[13px] font-medium text-text-primary">
+                      {formatDate(vehicle.batteryWarranty.start)} –{" "}
+                      {formatDate(vehicle.batteryWarranty.end)}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </Panel>
         )}

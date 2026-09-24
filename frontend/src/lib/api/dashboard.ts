@@ -100,6 +100,11 @@ export async function getDashboardData(
     ]);
 
     const data = normaliseCommandCenter(payload, "api");
+    // The Batteries KPI card's own maintenance-due figure must stay
+    // battery-scoped (it sits alongside battery-only highRisk/
+    // predictedFailures) — riskSummary.maintenance_due is fleet-wide, so the
+    // per-type breakdown is what belongs here, not the top-level count.
+    const batteryMaintenanceDue = riskSummary?.by_asset_type?.battery?.maintenance_due;
     const stationRisk = stationRiskItems.map(normaliseOperationsRisk);
     const chargerRisk = chargerRiskItems.map(normaliseOperationsRisk);
 
@@ -123,12 +128,17 @@ export async function getDashboardData(
           ...data.batteries,
           // The command centre does not carry a maintenance-due count; the
           // dedicated risk-summary endpoint does.
-          maintenanceDue:
-            riskSummary?.maintenance_due.count ?? data.batteries.maintenanceDue,
+          maintenanceDue: batteryMaintenanceDue?.count ?? data.batteries.maintenanceDue,
         },
-        riskNotes: {
-          maintenanceDue: riskSummary?.maintenance_due.note ?? null,
-        },
+        fleetRiskSummary: riskSummary
+          ? {
+              total: riskSummary.total,
+              highRisk: riskSummary.high_risk_assets.count,
+              maintenanceDue: riskSummary.maintenance_due.count,
+              maintenanceDueNote: riskSummary.maintenance_due.note ?? null,
+              predictedFailures: riskSummary.predicted_failures.count,
+            }
+          : null,
         healthTrend: normaliseTrend(trend) ?? data.healthTrend,
         vehicles: vehicleSummary
           ? {

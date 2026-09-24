@@ -10,6 +10,7 @@ const TYPE_LABEL: Record<string, string> = {
   STATION: "Station",
   DOCK: "Dock",
   CHARGER: "Charger",
+  "2W_EV": "Vehicle",
 };
 
 export function PredictiveWarningsTable({ rows }: { rows: PredictiveWarningRow[] }) {
@@ -45,7 +46,25 @@ export function PredictiveWarningsTable({ rows }: { rows: PredictiveWarningRow[]
       key: "location",
       header: "Location",
       sortValue: (r) => r.location ?? "",
-      render: (r) => r.location ?? <span className="text-text-muted">—</span>,
+      // The platform never carries a battery's station/location in bulk —
+      // GET /operations/predictive-warnings and GET /batteries both omit it
+      // for all 3,124 packs; it only exists per-battery, via the expensive
+      // GET /batteries/{id}/linkage, which isn't practical to call once per
+      // row here. Shown as a plain dash with an explanatory tooltip rather
+      // than a "Not tracked" label.
+      render: (r) =>
+        r.location ?? (
+          <span
+            className="text-text-muted"
+            title={
+              r.assetType === "BATTERY"
+                ? "The platform doesn't expose a battery's station/location in bulk"
+                : undefined
+            }
+          >
+            —
+          </span>
+        ),
     },
     {
       key: "risk",

@@ -28,7 +28,7 @@ export function Topbar({
         <Link href="/" className="inline-block rounded hover:opacity-80">
           <h1 className="text-[19px] font-semibold leading-tight text-text-primary">{title}</h1>
         </Link>
-        <p className="text-[12px] leading-tight text-text-muted">{subtitle}</p>
+        {subtitle && <p className="text-[12px] leading-tight text-text-muted">{subtitle}</p>}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -51,10 +51,10 @@ export function Topbar({
 
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--series-1)] text-[13px] font-semibold text-white">
-            T
+            P
           </span>
           <span className="text-[13px] leading-tight">
-            <span className="block font-semibold text-text-primary">Tanya</span>
+            <span className="block font-semibold text-text-primary">Pradeep</span>
             <span className="block text-text-muted">Read Only</span>
           </span>
         </div>

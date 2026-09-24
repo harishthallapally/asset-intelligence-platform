@@ -6,6 +6,16 @@ import { StatCard } from "@/components/ui/StatCard";
 import { PredictiveWarningsTable } from "@/components/predictions/PredictiveWarningsTable";
 import { getPredictiveWarningsPage } from "@/lib/api/resources";
 
+/** Math.round alone turns a real, non-zero count (2 of 4,130 = 0.05%) into a
+ * flat "0%", which reads as contradictory next to a non-zero number above
+ * it — "<1%" says the same true thing honestly instead. */
+function sharePct(count: number, total: number): string {
+  if (total <= 0) return "0%";
+  const pct = (count / total) * 100;
+  if (count > 0 && pct < 1) return "<1%";
+  return `${Math.round(pct)}%`;
+}
+
 export default async function AiPredictionsPage() {
   const { data: rows, error } = await getPredictiveWarningsPage();
 
@@ -33,7 +43,7 @@ export default async function AiPredictionsPage() {
             iconColor="var(--status-critical)"
             label="Critical Risk"
             value={critical}
-            breakdown={[{ label: "of total", value: `${Math.round((critical / (rows.length || 1)) * 100)}%`, tone: "critical" }]}
+            breakdown={[{ label: "of total", value: sharePct(critical, rows.length), tone: "critical" }]}
           />
           <StatCard
             icon={AlertTriangle}
@@ -41,7 +51,7 @@ export default async function AiPredictionsPage() {
             iconColor="var(--status-warning)"
             label="High Risk or Above"
             value={highRisk}
-            breakdown={[{ label: "of total", value: `${Math.round((highRisk / (rows.length || 1)) * 100)}%`, tone: "warning" }]}
+            breakdown={[{ label: "of total", value: sharePct(highRisk, rows.length), tone: "warning" }]}
           />
           <StatCard
             icon={AlertOctagon}
@@ -49,7 +59,7 @@ export default async function AiPredictionsPage() {
             iconColor="var(--series-7)"
             label="P1 Priority"
             value={p1}
-            breakdown={[{ label: "of total", value: `${Math.round((p1 / (rows.length || 1)) * 100)}%`, tone: "critical" }]}
+            breakdown={[{ label: "of total", value: sharePct(p1, rows.length), tone: "critical" }]}
           />
         </div>
 

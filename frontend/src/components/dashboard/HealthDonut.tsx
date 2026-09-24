@@ -49,6 +49,7 @@ export function HealthDonut({ buckets, total }: { buckets: Bucket[]; total: numb
                 ))}
               </Pie>
               <Tooltip
+                wrapperStyle={{ zIndex: 30 }}
                 contentStyle={{
                   background: "var(--surface-1)",
                   border: "1px solid var(--border-hairline)",
@@ -63,7 +64,10 @@ export function HealthDonut({ buckets, total }: { buckets: Bucket[]; total: numb
         ) : (
           <div className="flex h-full w-full items-center justify-center rounded-full border-[18px] border-[var(--surface-2)]" />
         )}
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        {/* z-0, explicitly below the Tooltip's z-30 (set above) — without it
+            this label, painting after the chart in DOM order, sits on top of
+            the hover tooltip by default and the two overlap illegibly. */}
+        <div className="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center">
           <span className="text-[26px] font-semibold leading-tight tabular-nums text-text-primary">
             {total.toLocaleString()}
           </span>

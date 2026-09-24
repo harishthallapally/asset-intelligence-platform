@@ -63,7 +63,7 @@ export default async function BatteryDetailPage({
 
   if (error || !battery) {
     return (
-      <PageShell title={batteryId} subtitle="Battery 360">
+      <PageShell title={batteryId} subtitle="">
         <ApiErrorState title={`Could not load ${batteryId}`} error={error ?? "Unknown error"} />
       </PageShell>
     );
@@ -75,31 +75,25 @@ export default async function BatteryDetailPage({
   const { manufactureDate, warrantyMonths, warrantyStatus } = battery.equipment;
   const coverageEnd =
     manufactureDate && warrantyMonths != null ? addMonths(manufactureDate, warrantyMonths) : null;
+  // This is a Server Component — re-running per request and reading "now" at
+  // request time is the intended behaviour for a countdown, not a rendering-
+  // purity bug (eslint-plugin-react-hooks can't tell server from client here).
+  // eslint-disable-next-line react-hooks/purity
   const daysToEnd = coverageEnd ? Math.round((coverageEnd.getTime() - Date.now()) / 86_400_000) : null;
   const hasWarrantyInfo = warrantyStatus != null || warrantyMonths != null;
 
+  const subtitle = battery.equipment.firmwareVersion ? `v${battery.equipment.firmwareVersion}` : "";
+
   return (
-    <PageShell title={battery.batteryId} subtitle="Battery 360">
+    <PageShell title={battery.batteryId} subtitle={subtitle}>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/batteries"
-            className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
-          >
-            <ArrowLeft size={14} />
-            All batteries
-          </Link>
-          <div className="flex items-center gap-2">
-            {battery.equipment.firmwareVersion && (
-              <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
-                v{battery.equipment.firmwareVersion}
-              </span>
-            )}
-            {battery.equipment.manufactureDate && (
-              <span className="text-[11px] text-text-muted">Mfg {formatDate(battery.equipment.manufactureDate)}</span>
-            )}
-          </div>
-        </div>
+        <Link
+          href="/batteries"
+          className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
+        >
+          <ArrowLeft size={14} />
+          All batteries
+        </Link>
 
         <Panel>
           <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">

@@ -102,7 +102,20 @@ export interface DashboardData {
   healthBuckets: Bucket[];
   /** Total the donut is drawn from — all monitored assets, not just batteries. */
   distributionTotal: number;
-  riskNotes: { maintenanceDue: string | null };
+  /** GET /operations/risk-summary's own fleet-wide figures — every asset
+   * type combined, with a matching total for the percentage math. The "AI
+   * Risk Summary" panel is titled generically (not "Battery Risk Summary"),
+   * so it reads from here rather than the batteries-only block above; a
+   * battery-only predicted-failure count of 0 would otherwise hide the
+   * charger/station predictions that do exist. null only if the endpoint
+   * itself failed to load. */
+  fleetRiskSummary: {
+    total: number;
+    highRisk: number;
+    maintenanceDue: number;
+    maintenanceDueNote: string | null;
+    predictedFailures: number;
+  } | null;
   alerts: DashboardAlert[];
   atRisk: AtRiskRow[];
   /** Vehicle-specific risk rows from the command-center API. */
@@ -265,7 +278,7 @@ export function normaliseCommandCenter(
     })),
     healthBuckets: [],
     distributionTotal: total,
-    riskNotes: { maintenanceDue: null },
+    fleetRiskSummary: null,
     healthTrend: normaliseTrend(payload.health_trend),
   };
 }
@@ -1125,6 +1138,10 @@ function predictiveWarningHref(
   const type = assetType.toUpperCase();
   if (type === "BATTERY") return `/batteries/${assetId}`;
   if (type === "STATION") return `/stations/${assetId}`;
+  // The 2W EV fleet's own asset_type string — "2W_EV" ids look like
+  // "EV-2W-1015", which the DOCK/CHARGER regex below never matches, so this
+  // case has to come first or a vehicle row silently gets no link at all.
+  if (type === "2W_EV") return `/vehicles/${assetId}`;
   // DOCK and CHARGER ids here look like "QIS-018-03" — no per-dock page
   // exists, so link to the parent station (the id's first two segments).
   const stationMatch = assetId.match(/^([A-Za-z]+-?\d+)-\d+$/);

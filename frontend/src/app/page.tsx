@@ -296,12 +296,18 @@ export default async function DashboardPage({
               </div>
             }
           >
+            {/* Fleet-wide (every asset type), not battery-only — this panel
+                is titled generically, and a battery-only predicted-failure
+                count can read 0 while chargers/stations still have real
+                ones (see DashboardData.fleetRiskSummary). Falls back to the
+                battery-only figures only if the dedicated endpoint itself
+                failed to load. */}
             <RiskSummaryPanel
-              highRisk={batteries.highRisk}
-              maintenanceDue={batteries.maintenanceDue}
-              maintenanceDueNote={data.riskNotes.maintenanceDue}
-              predictedFailures={batteries.predictedFailures}
-              total={batteries.total}
+              highRisk={data.fleetRiskSummary?.highRisk ?? batteries.highRisk}
+              maintenanceDue={data.fleetRiskSummary?.maintenanceDue ?? batteries.maintenanceDue}
+              maintenanceDueNote={data.fleetRiskSummary?.maintenanceDueNote ?? null}
+              predictedFailures={data.fleetRiskSummary?.predictedFailures ?? batteries.predictedFailures}
+              total={data.fleetRiskSummary?.total ?? batteries.total}
             />
           </Panel>
 

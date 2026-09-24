@@ -13,6 +13,12 @@ import { getChargerDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
 
+const WARRANTY_TONE: Record<string, string> = {
+  IN_WARRANTY: "var(--status-good)",
+  EXPIRING_SOON: "var(--status-warning)",
+  EXPIRED: "var(--status-critical)",
+};
+
 function label(value: string): string {
   return value
     .replace(/[_-]+/g, " ")
@@ -24,6 +30,18 @@ function formatDate(value: string | null): string {
   if (!value) return "—";
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("en-IN", { dateStyle: "medium" });
+}
+
+/** The charger detail endpoint gives a manufacture date and a warranty
+ * length in months but no separate end date, same as a battery's — the
+ * coverage end date is derived here the same way (see the Battery detail
+ * page's own addMonths). */
+function addMonths(dateStr: string, months: number): Date | null {
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const result = new Date(parsed);
+  result.setMonth(result.getMonth() + months);
+  return result;
 }
 
 /** The service sends `last_seen: null` for chargers that have never reported;
@@ -58,31 +76,34 @@ export default async function ChargerDetailPage({
 
   const { charger, scoring, station, telemetry } = data;
   const scoredLabel = scoring ? formatScoredAt(scoring.scoredAt) : null;
+  const subtitle = scoring?.equipment.firmwareVersion
+    ? `Dock ${charger.dockId} · v${scoring.equipment.firmwareVersion}`
+    : `Dock ${charger.dockId}`;
+
+  const { manufactureDate, warrantyMonths, warrantyStatus } = scoring?.equipment ?? {
+    manufactureDate: null,
+    warrantyMonths: null,
+    warrantyStatus: null,
+  };
+  const coverageEnd =
+    manufactureDate && warrantyMonths != null ? addMonths(manufactureDate, warrantyMonths) : null;
+  // This is a Server Component — re-running per request and reading "now" at
+  // request time is the intended behaviour for a countdown, not a rendering-
+  // purity bug (eslint-plugin-react-hooks can't tell server from client here).
+  // eslint-disable-next-line react-hooks/purity
+  const daysToEnd = coverageEnd ? Math.round((coverageEnd.getTime() - Date.now()) / 86_400_000) : null;
+  const hasWarrantyInfo = warrantyStatus != null || warrantyMonths != null;
 
   return (
-    <PageShell title={`${charger.stationId} · ${charger.chargerId}`} subtitle={`Dock ${charger.dockId}`}>
+    <PageShell title={`${charger.stationId} · ${charger.chargerId}`} subtitle={subtitle}>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/chargers"
-            className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
-          >
-            <ArrowLeft size={14} />
-            All chargers
-          </Link>
-          {scoring && (scoring.equipment.firmwareVersion || scoring.equipment.manufactureDate) && (
-            <div className="flex items-center gap-2">
-              {scoring.equipment.firmwareVersion && (
-                <span className="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-text-muted ring-1 ring-[var(--border-hairline)]">
-                  v{scoring.equipment.firmwareVersion}
-                </span>
-              )}
-              {scoring.equipment.manufactureDate && (
-                <span className="text-[11px] text-text-muted">Mfg {formatDate(scoring.equipment.manufactureDate)}</span>
-              )}
-            </div>
-          )}
-        </div>
+        <Link
+          href="/chargers"
+          className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--series-1)] hover:underline"
+        >
+          <ArrowLeft size={14} />
+          All chargers
+        </Link>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Panel>
@@ -196,6 +217,51 @@ export default async function ChargerDetailPage({
                 </div>
               </div>
             </Panel>
+
+            {hasWarrantyInfo && (
+              <Panel title="Charger Warranty">
+                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-5">
+                  <div>
+                    <div className="text-[12px] text-text-muted">Status</div>
+                    <div
+                      className="mt-1 text-[15px] font-semibold"
+                      style={{
+                        color: warrantyStatus
+                          ? (WARRANTY_TONE[warrantyStatus.toUpperCase()] ?? "var(--text-primary)")
+                          : "var(--text-primary)",
+                      }}
+                    >
+                      {warrantyStatus ? label(warrantyStatus) : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Warranty Period</div>
+                    <div className="mt-1 text-[15px] font-semibold tabular-nums text-text-primary">
+                      {warrantyMonths != null ? `${warrantyMonths} months` : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Manufactured</div>
+                    <div className="mt-1 text-[15px] font-semibold text-text-primary">{formatDate(manufactureDate)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">Coverage Until</div>
+                    <div className="mt-1 text-[15px] font-semibold text-text-primary">
+                      {coverageEnd ? coverageEnd.toLocaleDateString("en-IN", { dateStyle: "medium" }) : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[12px] text-text-muted">{daysToEnd !== null && daysToEnd < 0 ? "Expired" : "Days Remaining"}</div>
+                    <div
+                      className="mt-1 text-[15px] font-semibold tabular-nums"
+                      style={{ color: daysToEnd !== null && daysToEnd < 0 ? "var(--status-critical)" : "var(--text-primary)" }}
+                    >
+                      {daysToEnd !== null ? `${Math.abs(daysToEnd)} days${daysToEnd < 0 ? " ago" : ""}` : "—"}
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            )}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <Panel title="Health Dimensions">
