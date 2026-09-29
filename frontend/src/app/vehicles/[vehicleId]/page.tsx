@@ -150,7 +150,7 @@ export default async function VehicleDetailPage({
           </div>
         </Panel>
 
-        {(vehicle.batteryWarranty || vehicle.equipment.manufactureDate) && (
+        {(vehicle.batteryWarranty || vehicle.equipment.manufactureDate || vehicle.equipment.deliveryDate) && (
           <Panel title="Battery Warranty">
             <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
               {vehicle.equipment.manufactureDate && (
@@ -158,6 +158,14 @@ export default async function VehicleDetailPage({
                   <div className="text-[12px] text-text-muted">Vehicle Manufactured</div>
                   <div className="mt-1 text-[15px] font-semibold text-text-primary">
                     {formatDate(vehicle.equipment.manufactureDate)}
+                  </div>
+                </div>
+              )}
+              {vehicle.equipment.deliveryDate && (
+                <div>
+                  <div className="text-[12px] text-text-muted">Vehicle Delivered</div>
+                  <div className="mt-1 text-[15px] font-semibold text-text-primary">
+                    {formatDate(vehicle.equipment.deliveryDate)}
                   </div>
                 </div>
               )}

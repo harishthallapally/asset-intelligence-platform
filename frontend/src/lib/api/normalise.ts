@@ -427,6 +427,10 @@ function dimensionLabel(key: string): string {
 export interface EquipmentView {
   firmwareVersion: string | null;
   manufactureDate: string | null;
+  /** Only the vehicle detail endpoint sends this — batteries and chargers
+   * have no delivery_date field at all, not just an unpopulated one. null
+   * either way, so callers don't need to special-case which asset type. */
+  deliveryDate: string | null;
   warrantyMonths: number | null;
   warrantyStatus: string | null;
 }
@@ -434,12 +438,14 @@ export interface EquipmentView {
 function normaliseEquipment(detail: {
   firmware_version?: string | null;
   manufacture_date?: string | null;
+  delivery_date?: string | null;
   warranty_months?: number | null;
   warranty_status?: string | null;
 }): EquipmentView {
   return {
     firmwareVersion: detail.firmware_version ?? null,
     manufactureDate: detail.manufacture_date ?? null,
+    deliveryDate: detail.delivery_date ?? null,
     warrantyMonths: detail.warranty_months ?? null,
     warrantyStatus: detail.warranty_status ?? null,
   };

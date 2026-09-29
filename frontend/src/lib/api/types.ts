@@ -225,6 +225,9 @@ export interface ApiVehicleDetail extends ApiVehicleSummary {
    * above, which covers the fitted battery pack specifically. */
   firmware_version?: string | null;
   manufacture_date?: string | null;
+  /** When the vehicle itself was handed over — distinct from manufacture_date.
+   * Only this endpoint sends it; batteries/chargers have no equivalent. */
+  delivery_date?: string | null;
   warranty_months?: number | null;
   warranty_status?: string | null;
 }
