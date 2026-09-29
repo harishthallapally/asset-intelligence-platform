@@ -336,13 +336,10 @@ export interface StationRow {
    * embeds this directly now, so it's populated from the very first fetch
    * rather than only after a separate /stations/scores merge. */
   healthScore: number | null;
-  /** GET /stations now embeds the same scoring GET /stations/scores does,
-   * so these are populated directly in normaliseStation — `mergeStationScore`
-   * only needs to run for the *composite* figures (see below), which stay
-   * exclusive to /stations/scores and /stations/{id}. `riskScore`,
-   * `riskCategoryRaw` and `priority` are already the *composite* figures
-   * (raw risk folded together with any non-telemetry insight) when one
-   * applies — the "top", truest number, not the raw telemetry-only one. */
+  /** The API's own risk_score / risk_category / priority — the same figures
+   * GET /stations and GET /operations/predictive-warnings report, so P1
+   * counts agree across every screen. The insight-adjusted composite figures
+   * are only shown as context on the station detail page. */
   healthClassification: string | null;
   anomalyScore: number | null;
   anomalySeverity: string | null;
@@ -350,48 +347,26 @@ export interface StationRow {
   riskCategoryRaw: string | null;
   priority: string | null;
   likelyIssue: string | null;
-  /** True when a non-telemetry insight (seasonal climate, regional
-   * connectivity, etc.) pushed the figures above beyond the raw
-   * telemetry-only score below. */
-  riskEscalated: boolean;
-  /** The raw, telemetry-only score/category — equal to riskScore/
-   * riskCategoryRaw above when nothing escalated it. */
-  baseRiskScore: number | null;
-  baseRiskCategoryRaw: string | null;
-  insightCount: number;
-  upliftReasons: string[];
 }
 
 /** Merges a GET /stations/scores row into a station's overview row — kept
  * separate from `normaliseStation` since the two come from different calls
- * that can succeed or fail independently. Prefers the composite risk figures
- * over the raw ones whenever an insight actually applies (composite_risk_score
- * non-null) — see StationRow's riskScore doc. */
+ * that can succeed or fail independently. */
 export function mergeStationScore(
   row: StationRow,
   score: ApiStationScore | undefined,
 ): StationRow {
   if (!score) return row;
-  const hasComposite = score.composite_risk_score !== null;
   return {
     ...row,
     healthScore: score.health_score,
     healthClassification: score.health_classification,
     anomalyScore: score.anomaly_score,
     anomalySeverity: score.anomaly_severity,
-    riskScore: hasComposite ? score.composite_risk_score : score.risk_score,
-    riskCategoryRaw: hasComposite
-      ? (score.composite_risk_category ?? score.risk_category)
-      : score.risk_category,
-    priority: hasComposite
-      ? (score.composite_priority ?? score.priority)
-      : score.priority,
+    riskScore: score.risk_score,
+    riskCategoryRaw: score.risk_category,
+    priority: score.priority,
     likelyIssue: score.likely_issue,
-    riskEscalated: score.composite_escalated,
-    baseRiskScore: score.risk_score,
-    baseRiskCategoryRaw: score.risk_category,
-    insightCount: score.insight_count,
-    upliftReasons: score.uplift_reasons,
   };
 }
 
@@ -680,11 +655,6 @@ export function normaliseStation(row: ApiStation): StationRow {
     riskCategoryRaw: row.risk_category ?? null,
     priority: row.priority ?? null,
     likelyIssue: row.likely_issue ?? null,
-    riskEscalated: false,
-    baseRiskScore: row.risk_score ?? null,
-    baseRiskCategoryRaw: row.risk_category ?? null,
-    insightCount: 0,
-    upliftReasons: [],
   };
 }
 
@@ -1034,8 +1004,7 @@ export interface StationDetailView {
   healthClassification: string;
   anomalyScore: number;
   anomalySeverity: string;
-  /** The composite figures (raw risk folded together with any non-telemetry
-   * insight below) when one applies — the "top", truest number. */
+  /** The API's own risk figures — the same ones every list screen shows. */
   riskScore: number;
   riskCategory: RiskCategory;
   riskCategoryRaw: string;
@@ -1043,11 +1012,9 @@ export interface StationDetailView {
   likelyIssue: string;
   predictionWindow: string;
   scoredAt: string;
-  /** True when aiInsights below actually pushed the figures above beyond
-   * the raw telemetry-only score. */
-  riskEscalated: boolean;
-  baseRiskScore: number;
-  baseRiskCategoryRaw: string;
+  /** Insight-adjusted figures from the aiInsights below, or null when none
+   * apply. Shown as context only. */
+  composite: { riskScore: number; riskCategoryRaw: string; priority: string } | null;
   upliftReasons: string[];
   dimensions: { key: string; label: string; score: number }[];
   detectedSignals: string[];
@@ -1064,7 +1031,6 @@ export interface StationDetailView {
 export function normaliseStationDetail(
   detail: ApiStationDetail,
 ): StationDetailView {
-  const hasComposite = detail.composite_risk_score !== null;
   return {
     stationId: detail.station_id,
     location: detail.location,
@@ -1072,28 +1038,21 @@ export function normaliseStationDetail(
     healthClassification: detail.health_classification,
     anomalyScore: detail.anomaly_score,
     anomalySeverity: detail.anomaly_severity,
-    riskScore: hasComposite
-      ? (detail.composite_risk_score as number)
-      : detail.risk_score,
-    riskCategory: riskCategory(
-      hasComposite
-        ? (detail.composite_risk_category ?? detail.risk_category)
-        : detail.risk_category,
-    ),
-    riskCategoryRaw: hasComposite
-      ? (detail.composite_risk_category ?? detail.risk_category)
-      : detail.risk_category,
-    priority: hasComposite
-      ? (detail.composite_priority ?? detail.priority)
-      : detail.priority,
+    riskScore: detail.risk_score,
+    riskCategory: riskCategory(detail.risk_category),
+    riskCategoryRaw: detail.risk_category,
+    priority: detail.priority,
     likelyIssue: detail.likely_issue,
-    predictionWindow: hasComposite
-      ? (detail.composite_prediction_window ?? detail.prediction_window)
-      : detail.prediction_window,
+    predictionWindow: detail.prediction_window,
     scoredAt: detail.scored_at,
-    riskEscalated: detail.composite_escalated,
-    baseRiskScore: detail.risk_score,
-    baseRiskCategoryRaw: detail.risk_category,
+    composite:
+      detail.composite_risk_score !== null
+        ? {
+            riskScore: detail.composite_risk_score,
+            riskCategoryRaw: detail.composite_risk_category ?? detail.risk_category,
+            priority: detail.composite_priority ?? detail.priority,
+          }
+        : null,
     upliftReasons: detail.uplift_reasons ?? [],
     dimensions: Object.entries(detail.dimension_scores ?? {}).map(
       ([key, score]) => ({

@@ -6,7 +6,7 @@ import { RiskPill } from "@/components/ui/RiskPill";
 import { MAP_LEGEND, NetworkMap, type MapAssetMarker, type MapCityLabel, type MapMarker } from "@/components/dashboard/NetworkMap";
 import { KIND_STYLE, TopRiskAssets, type RankedAsset } from "@/components/dashboard/TopRiskAssets";
 import { cityCoordFromLocation, jitterCoord } from "@/lib/geo/indiaCities";
-import { getStationsPage, getPredictiveWarningsPage } from "@/lib/api/resources";
+import { getChargersPage, getStationsPage, getPredictiveWarningsPage } from "@/lib/api/resources";
 import type { StationRow } from "@/lib/api/normalise";
 
 /** Every station has a `location` string ("Bengaluru, Karnataka") but no
@@ -65,9 +65,10 @@ interface P1Asset {
 }
 
 export default async function MapViewPage() {
-  const [{ data, error }, { data: predictiveRows }] = await Promise.all([
+  const [{ data, error }, { data: predictiveRows }, { data: chargerRows }] = await Promise.all([
     getStationsPage(),
     getPredictiveWarningsPage(),
+    getChargersPage(),
   ]);
 
   if (error || !data) {
@@ -113,14 +114,25 @@ export default async function MapViewPage() {
     .sort((a, b) => b[1].riskSum / b[1].stations - a[1].riskSum / a[1].stations)
     .slice(0, 5);
 
-  // Every asset currently at the platform's highest priority band (P1) —
-  // from GET /operations/predictive-warnings, the same register the AI
-  // Predictions page ranks by, filtered client-side rather than a second
-  // "one worst per category" sample. P1 is reserved for the most urgent
-  // cases fleet-wide, so this is normally a small, uncluttered set — not
-  // one marker per category, but the real current list.
-  const p1Assets: P1Asset[] = (predictiveRows ?? [])
-    .filter((row) => row.priority === "P1")
+  // Every asset currently at P1. Stations, vehicles, batteries and docks come
+  // from GET /operations/predictive-warnings; chargers come from GET /chargers
+  // instead, because the register's CHARGER rows are dock-level ids scored
+  // differently and never match the priorities the Chargers screen shows.
+  const locationByStation = new Map(stations.map((s) => [s.stationId, s.name]));
+  const p1Chargers: P1Asset[] = (chargerRows ?? [])
+    .filter((c) => c.priority === "P1" && c.riskScore != null)
+    .map((c) => ({
+      kind: "charger" as const,
+      id: `${c.stationId}-${c.chargerId}`,
+      href: `/chargers/${c.chargerId}?station=${c.stationId}`,
+      location: locationByStation.get(c.stationId) ?? "",
+      riskScore: c.riskScore!,
+      riskCategoryRaw: c.riskCategoryRaw ?? "LOW",
+      priority: "P1",
+      issue: c.likelyIssue ?? "No issue reported",
+    }));
+  const p1Register: P1Asset[] = (predictiveRows ?? [])
+    .filter((row) => row.priority === "P1" && row.assetType.toUpperCase() !== "CHARGER")
     .flatMap((row) => {
       const kind = KIND_BY_ASSET_TYPE[row.assetType.toUpperCase()];
       if (!kind || !row.href || row.riskScore == null) return [];
@@ -136,8 +148,8 @@ export default async function MapViewPage() {
           issue: row.likelyIssue ?? "No issue reported",
         },
       ];
-    })
-    .sort((a, b) => b.riskScore - a.riskScore);
+    });
+  const p1Assets = [...p1Register, ...p1Chargers].sort((a, b) => b.riskScore - a.riskScore);
 
   // Side list: the riskiest P1 assets, capped per type (5 in total).
   const quota: Partial<Record<RankedAsset["kind"], number>> = { station: 2, vehicle: 2, battery: 1 };

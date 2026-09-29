@@ -149,15 +149,15 @@ export default async function StationDetailPage({
                   <div className="mt-1 text-[13px] font-medium text-text-primary">{scoring.predictionWindow}</div>
                 </div>
               </div>
-              {scoring.riskEscalated && (
-                <p
-                  className="mt-4 border-t border-[var(--border-hairline)] pt-3 text-[12.5px] font-medium leading-relaxed"
-                  style={{ color: "var(--status-critical)" }}
-                >
-                  Escalated from {scoring.baseRiskScore}% ({label(scoring.baseRiskCategoryRaw)}) to{" "}
-                  {scoring.riskScore}% ({label(scoring.riskCategoryRaw)}) — {scoring.upliftReasons.join(", ")}.
-                </p>
-              )}
+              {scoring.composite &&
+                (scoring.composite.riskScore !== scoring.riskScore ||
+                  scoring.composite.priority !== scoring.priority) && (
+                  <p className="mt-4 border-t border-[var(--border-hairline)] pt-3 text-[12.5px] font-medium leading-relaxed text-text-secondary">
+                    Insight-adjusted: {scoring.composite.riskScore}% ({label(scoring.composite.riskCategoryRaw)},{" "}
+                    {scoring.composite.priority})
+                    {scoring.upliftReasons.length > 0 ? ` — ${scoring.upliftReasons.join(", ")}` : ""}.
+                  </p>
+                )}
             </Panel>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
