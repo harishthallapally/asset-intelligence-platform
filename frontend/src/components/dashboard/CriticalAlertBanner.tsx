@@ -2,30 +2,22 @@ import Link from "next/link";
 import { ArrowRight, TriangleAlert } from "lucide-react";
 import { riskCategory, type StationRow } from "@/lib/api/normalise";
 
-/** An offline station always sorts to the top regardless of what it last
- * reported — the same rule the Map View and Stations screen use. */
-function effectiveRisk(station: StationRow): number {
-  return !station.online ? 100 : (station.riskScore ?? -1);
-}
-
 /**
- * Surfaces the single most urgent station at the top of the dashboard and
- * links straight to it, so the highest-priority action is one click from
- * landing. Renders nothing when nothing is above the Low risk band and every
- * station is online.
+ * Surfaces the riskiest P1 station at the top of the dashboard and links
+ * straight to it. Renders nothing when no station is at P1.
  */
 export function CriticalAlertBanner({ stations }: { stations: StationRow[] }) {
-  const worst = [...stations].sort((a, b) => effectiveRisk(b) - effectiveRisk(a))[0];
+  const p1 = stations
+    .filter((s) => s.priority === "P1")
+    .sort((a, b) => (b.riskScore ?? -1) - (a.riskScore ?? -1));
+  const worst = p1[0];
   if (!worst) return null;
 
   const category = riskCategory(worst.riskCategoryRaw ?? "LOW");
-  if (worst.online && category === "LOW") return null;
-
   const critical = !worst.online || category === "CRITICAL";
   const tone = critical ? "var(--status-critical)" : "var(--status-serious)";
   const bg = critical ? "var(--status-critical-bg)" : "var(--status-serious-bg)";
-  const others =
-    stations.filter((s) => !s.online || riskCategory(s.riskCategoryRaw ?? "LOW") !== "LOW").length - 1;
+  const others = p1.length - 1;
 
   return (
     <Link
@@ -46,7 +38,7 @@ export function CriticalAlertBanner({ stations }: { stations: StationRow[] }) {
               ? "station offline"
               : `${Math.round(worst.riskScore ?? 0)}% predictive risk (${category.toLowerCase()})`}
             {worst.likelyIssue ? `, ${worst.likelyIssue}` : ""}
-            {others > 0 ? ` · ${others} other station${others === 1 ? "" : "s"} also flagged` : ""}
+            {others > 0 ? ` · ${others} other P1 station${others === 1 ? "" : "s"}` : ""}
           </span>
         </span>
       </span>
@@ -54,7 +46,7 @@ export function CriticalAlertBanner({ stations }: { stations: StationRow[] }) {
         className="flex flex-none items-center gap-1.5 text-[12.5px] font-semibold"
         style={{ color: tone }}
       >
-        {worst.priority ?? "—"} · View station
+        P1 · View station
         <ArrowRight size={13} />
       </span>
     </Link>

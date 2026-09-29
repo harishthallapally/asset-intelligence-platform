@@ -139,26 +139,26 @@ export default async function MapViewPage() {
     })
     .sort((a, b) => b.riskScore - a.riskScore);
 
-  // The side list is one riskiest asset per type, drawn from the whole
-  // register (not just P1) so every type is represented.
-  const worstByKind = new Map<RankedAsset["kind"], RankedAsset>();
-  for (const row of predictiveRows ?? []) {
-    const kind = KIND_BY_ASSET_TYPE[row.assetType.toUpperCase()];
-    if (!kind || !row.href || row.riskScore == null) continue;
-    const current = worstByKind.get(kind);
-    if (current && current.risk >= row.riskScore) continue;
-    worstByKind.set(kind, {
-      id: row.assetId,
-      key: `${kind}-${row.assetId}`,
-      kind,
-      href: row.href,
-      issue: row.likelyIssue ?? "No issue reported",
-      location: row.location ?? "",
-      risk: row.riskScore,
-      tag: row.priority,
-    });
-  }
-  const topAssets: RankedAsset[] = [...worstByKind.values()];
+  // Side list: the riskiest P1 assets, capped per type (5 in total).
+  const quota: Partial<Record<RankedAsset["kind"], number>> = { station: 2, vehicle: 2, battery: 1 };
+  const taken = new Map<RankedAsset["kind"], number>();
+  const topAssets: RankedAsset[] = p1Assets
+    .filter((c) => {
+      const count = taken.get(c.kind) ?? 0;
+      if (count >= (quota[c.kind] ?? 0)) return false;
+      taken.set(c.kind, count + 1);
+      return true;
+    })
+    .map((c) => ({
+      id: c.id,
+      key: `${c.kind}-${c.id}`,
+      kind: c.kind,
+      href: c.href,
+      issue: c.issue,
+      location: c.location,
+      risk: c.riskScore,
+      tag: c.priority,
+    }));
 
   // Same set, placed on the map — each one's own `location` string resolves
   // to a city coordinate exactly like a station's does, jittered by its own
@@ -223,7 +223,7 @@ export default async function MapViewPage() {
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Top Risk Assets" titleNote="(top 1 per asset type)">
+          <Panel title="Top Risk Assets" titleNote="(top 5 at P1 priority)">
             <TopRiskAssets assets={topAssets} limit={5} />
           </Panel>
 
