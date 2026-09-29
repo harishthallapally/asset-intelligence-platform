@@ -51,10 +51,10 @@ export function Topbar({
 
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--series-1)] text-[13px] font-semibold text-white">
-            P
+            T
           </span>
           <span className="text-[13px] leading-tight">
-            <span className="block font-semibold text-text-primary">Pradeep</span>
+            <span className="block font-semibold text-text-primary">Tanya</span>
             <span className="block text-text-muted">Read Only</span>
           </span>
         </div>

@@ -147,11 +147,11 @@ export default async function DashboardPage({
   return (
     <PageShell
       title="Dashboard"
-      subtitle="Overview of Stations, Chargers & Batteries"
+      subtitle="Overview of Stations, Chargers, Batteries & Vehicles"
     >
       <div className="flex flex-col gap-3">
         <DataSourceBadge source={data.source} />
-        <CriticalAlertBanner rows={data.atRisk} />
+        <CriticalAlertBanner stations={stations} />
 
         <div
           className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${data.vehicles ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
@@ -213,11 +213,6 @@ export default async function DashboardPage({
                 value: batteries.highRisk,
                 tone: "warning",
               },
-              {
-                label: "Predicted",
-                value: batteries.predictedFailures,
-                tone: "critical",
-              },
             ]}
             items={batteryItems}
             emptyMessage="No battery above the Low risk band."
@@ -244,11 +239,6 @@ export default async function DashboardPage({
                   label: "High risk",
                   value: data.vehicles.highRisk,
                   tone: "warning" as const,
-                },
-                {
-                  label: "Predicted",
-                  value: data.vehicles.predictedFailures,
-                  tone: "critical" as const,
                 },
               ]}
               items={vehicleItems}

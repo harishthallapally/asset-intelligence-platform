@@ -6,8 +6,8 @@ import { RiskPill } from "@/components/ui/RiskPill";
 import { MAP_LEGEND, NetworkMap, type MapAssetMarker, type MapCityLabel, type MapMarker } from "@/components/dashboard/NetworkMap";
 import { KIND_STYLE, TopRiskAssets, type RankedAsset } from "@/components/dashboard/TopRiskAssets";
 import { cityCoordFromLocation, jitterCoord } from "@/lib/geo/indiaCities";
-import { getStationsPage, getTopAssetPerCategory } from "@/lib/api/resources";
-import { operationsRiskHref, type StationRow } from "@/lib/api/normalise";
+import { getStationsPage, getPredictiveWarningsPage } from "@/lib/api/resources";
+import type { StationRow } from "@/lib/api/normalise";
 
 /** Every station has a `location` string ("Bengaluru, Karnataka") but no
  * lat/lng of its own — the platform doesn't expose per-station coordinates
@@ -40,24 +40,20 @@ function effectiveRisk(station: StationRow): number {
   return !station.online ? 100 : (station.riskScore ?? -1);
 }
 
-function riskTextColor(riskCategoryRaw: string): string {
-  const v = riskCategoryRaw.toUpperCase();
-  if (v === "CRITICAL" || v === "HIGH") return "var(--status-critical)";
-  if (v === "MODERATE") return "var(--status-warning)";
-  return "var(--status-good)";
-}
-
+// The predictive-warnings register's own asset_type strings — "2W_EV" is the
+// 2-wheeler EV fleet's type string there (see normalisePredictiveWarning),
+// distinct from the "VEHICLE" kind this UI renders it as.
 const KIND_BY_ASSET_TYPE: Record<string, RankedAsset["kind"]> = {
   BATTERY: "battery",
   CHARGER: "charger",
   STATION: "station",
   DOCK: "dock",
-  VEHICLE: "vehicle",
+  "2W_EV": "vehicle",
 };
 
-/** One category's marker/list entry — the common fields needed to place and
- * rank it, whichever of the four categories it is. */
-interface CategoryAsset {
+/** One P1 asset's marker/list entry — the common fields needed to place and
+ * rank it, whichever asset type it is. */
+interface P1Asset {
   kind: RankedAsset["kind"];
   id: string;
   href: string;
@@ -69,7 +65,10 @@ interface CategoryAsset {
 }
 
 export default async function MapViewPage() {
-  const [{ data, error }, categoryRows] = await Promise.all([getStationsPage(), getTopAssetPerCategory()]);
+  const [{ data, error }, { data: predictiveRows }] = await Promise.all([
+    getStationsPage(),
+    getPredictiveWarningsPage(),
+  ]);
 
   if (error || !data) {
     return (
@@ -80,7 +79,6 @@ export default async function MapViewPage() {
   }
 
   const stations = data.rows;
-  const stationsOffline = stations.filter((s) => !s.online).length;
   const markers = stations.map(resolveMarker).filter((m): m is MapMarker => m !== null);
   const unresolvedCities = [...new Set(stations.filter((s) => !cityCoordFromLocation(s.name)).map((s) => s.name))];
 
@@ -115,43 +113,22 @@ export default async function MapViewPage() {
     .sort((a, b) => b[1].riskSum / b[1].stations - a[1].riskSum / a[1].stations)
     .slice(0, 5);
 
-  // One marker per category — battery, vehicle, charger and station each
-  // get their own single current worst instance, so all four always have a
-  // presence on the map (never crowded out by whichever type happens to be
-  // riskiest overall). Station comes from the already-loaded full register
-  // (real composite scoring, not a fifth fetch); the other three come from
-  // getTopAssetPerCategory. Dock is deliberately left out — it has no page
-  // of its own to link to (see operationsRiskHref).
-  // effectiveRisk is only used to pick *which* station is worst (an offline
-  // one always wins that ranking, even if its last-known score looks fine) —
-  // the percentage actually shown is the station's own real risk_score, never
-  // the synthetic 100 that ranking uses. Showing that fabricated number here
-  // would misrepresent a station's real, computed risk.
-  const topStation = [...stations].sort((a, b) => effectiveRisk(b) - effectiveRisk(a))[0];
-  const categoryAssets: CategoryAsset[] = [
-    ...(topStation
-      ? [
-          {
-            kind: "station" as const,
-            id: topStation.stationId,
-            href: `/stations/${topStation.stationId}`,
-            location: topStation.name,
-            riskScore: topStation.riskScore ?? 0,
-            riskCategoryRaw: topStation.riskCategoryRaw ?? (!topStation.online ? "CRITICAL" : "LOW"),
-            priority: topStation.priority ?? "P4",
-            issue: !topStation.online ? "Station offline" : (topStation.likelyIssue ?? "No issue reported"),
-          },
-        ]
-      : []),
-    ...categoryRows.flatMap((row) => {
+  // Every asset currently at the platform's highest priority band (P1) —
+  // from GET /operations/predictive-warnings, the same register the AI
+  // Predictions page ranks by, filtered client-side rather than a second
+  // "one worst per category" sample. P1 is reserved for the most urgent
+  // cases fleet-wide, so this is normally a small, uncluttered set — not
+  // one marker per category, but the real current list.
+  const p1Assets: P1Asset[] = (predictiveRows ?? [])
+    .filter((row) => row.priority === "P1")
+    .flatMap((row) => {
       const kind = KIND_BY_ASSET_TYPE[row.assetType.toUpperCase()];
-      const href = operationsRiskHref(row);
-      if (!kind || !href || row.riskScore == null) return [];
+      if (!kind || !row.href || row.riskScore == null) return [];
       return [
         {
           kind,
           id: row.assetId,
-          href,
+          href: row.href,
           location: row.location ?? "",
           riskScore: row.riskScore,
           riskCategoryRaw: row.riskCategoryRaw ?? "LOW",
@@ -159,25 +136,35 @@ export default async function MapViewPage() {
           issue: row.likelyIssue ?? "No issue reported",
         },
       ];
-    }),
-  ].sort((a, b) => b.riskScore - a.riskScore);
+    })
+    .sort((a, b) => b.riskScore - a.riskScore);
 
-  const topAssets: RankedAsset[] = categoryAssets.map((c) => ({
-    id: c.id,
-    key: `${c.kind}-${c.id}`,
-    kind: c.kind,
-    href: c.href,
-    issue: c.issue,
-    location: c.location,
-    risk: c.riskScore,
-    tag: c.priority,
-  }));
+  // The side list is one riskiest asset per type, drawn from the whole
+  // register (not just P1) so every type is represented.
+  const worstByKind = new Map<RankedAsset["kind"], RankedAsset>();
+  for (const row of predictiveRows ?? []) {
+    const kind = KIND_BY_ASSET_TYPE[row.assetType.toUpperCase()];
+    if (!kind || !row.href || row.riskScore == null) continue;
+    const current = worstByKind.get(kind);
+    if (current && current.risk >= row.riskScore) continue;
+    worstByKind.set(kind, {
+      id: row.assetId,
+      key: `${kind}-${row.assetId}`,
+      kind,
+      href: row.href,
+      issue: row.likelyIssue ?? "No issue reported",
+      location: row.location ?? "",
+      risk: row.riskScore,
+      tag: row.priority,
+    });
+  }
+  const topAssets: RankedAsset[] = [...worstByKind.values()];
 
-  // Same four, placed on the map — each one's own `location` string resolves
+  // Same set, placed on the map — each one's own `location` string resolves
   // to a city coordinate exactly like a station's does, jittered by its own
-  // id so two categories that happen to share a city don't land on the same
+  // id so two assets that happen to share a city don't land on the same
   // spot (or exactly on that city's plain station dot).
-  const assetMarkers: MapAssetMarker[] = categoryAssets.flatMap((c) => {
+  const assetMarkers: MapAssetMarker[] = p1Assets.flatMap((c) => {
     const coord = c.location ? cityCoordFromLocation(c.location) : null;
     if (!coord) return [];
     const jittered = jitterCoord(coord, `asset-${c.kind}-${c.id}`);
@@ -227,41 +214,6 @@ export default async function MapViewPage() {
               })}
             </div>
           )}
-          {/* Actionable, not explanatory — a direct jump to each of the four
-              flagged assets, so the map doubles as a shortcut bar instead of
-              just a picture the user still has to go find things from. */}
-          {categoryAssets.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-[var(--border-hairline)] pt-3">
-              {categoryAssets.map((asset) => {
-                const style = KIND_STYLE[asset.kind];
-                const Icon = style.icon;
-                return (
-                  <Link
-                    key={`${asset.kind}-${asset.id}`}
-                    href={asset.href}
-                    className="flex items-center gap-1.5 rounded-full border border-[var(--border-hairline)] py-1 pr-2.5 pl-1 text-[12px] font-medium text-text-secondary transition-colors hover:border-[var(--series-1)] hover:text-[var(--series-1)]"
-                  >
-                    <span
-                      className="flex h-4 w-4 flex-none items-center justify-center rounded-full"
-                      style={{ backgroundColor: style.color }}
-                    >
-                      <Icon size={9} className="text-white" strokeWidth={2.5} />
-                    </span>
-                    {asset.id}
-                    <span className="font-semibold" style={{ color: riskTextColor(asset.riskCategoryRaw) }}>
-                      {Math.round(asset.riskScore)}%
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-          {stationsOffline > 0 && (
-            <p className="mt-2.5 text-[12px] text-text-muted">
-              <span className="font-semibold text-[var(--status-critical)]">{stationsOffline}</span> of{" "}
-              {stations.length} station{stations.length === 1 ? "" : "s"} offline right now.
-            </p>
-          )}
           {unresolvedCities.length > 0 && (
             <p className="mt-1.5 text-[11.5px] text-text-muted">
               {unresolvedCities.length} station location{unresolvedCities.length === 1 ? "" : "s"} not shown on the
@@ -271,8 +223,8 @@ export default async function MapViewPage() {
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <Panel title="Top Risk Assets" titleNote="(one per category)">
-            <TopRiskAssets assets={topAssets} limit={4} />
+          <Panel title="Top Risk Assets" titleNote="(top 1 per asset type)">
+            <TopRiskAssets assets={topAssets} limit={5} />
           </Panel>
 
           <Panel title="Top Risk Stations" titleNote={`(top ${Math.min(5, topStations.length)} by risk score)`}>
