@@ -40,12 +40,12 @@ export function Sidebar({ alertCount }: { alertCount: number }) {
 
   return (
     <aside className="flex h-screen w-[212px] flex-none flex-col border-r border-[var(--border-hairline)] bg-[var(--surface-1)]">
-      <Link href="/" className="flex items-center px-5 py-5" aria-label="Indofast Energy — dashboard">
+      <Link href="/" className="flex items-center px-5 py-5" aria-label="Sun Mobility — dashboard">
         <Image
-          src="/indofast-logo.png"
-          alt="Indofast Energy"
-          width={784}
-          height={260}
+          src="/sun-mobility-logo.png"
+          alt="Sun Mobility"
+          width={201}
+          height={83}
           className="h-auto w-full"
           priority
         />
