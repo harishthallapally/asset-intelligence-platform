@@ -40,12 +40,12 @@ export function Sidebar({ alertCount }: { alertCount: number }) {
 
   return (
     <aside className="flex h-screen w-[212px] flex-none flex-col border-r border-[var(--border-hairline)] bg-[var(--surface-1)]">
-      <Link href="/" className="flex items-center px-5 py-5" aria-label="Sun Mobility — dashboard">
+      <Link href="/" className="flex items-center px-5 py-5" aria-label="Circumcircle Innovations — dashboard">
         <Image
-          src="/sun-mobility-logo.png"
-          alt="Sun Mobility"
-          width={201}
-          height={83}
+          src="/circumcircle-logo.png"
+          alt="Circumcircle Innovations"
+          width={312}
+          height={107}
           className="h-auto w-full"
           priority
         />
