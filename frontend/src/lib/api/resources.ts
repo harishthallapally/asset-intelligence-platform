@@ -8,6 +8,10 @@
 import {
   ApiUnavailableError,
   apiBaseUrl,
+  fetchApp,
+  fetchApps,
+  fetchAppSummary,
+  fetchAppTrend,
   fetchAssetTelemetry,
   fetchBatteries,
   fetchBattery,
@@ -32,9 +36,18 @@ import {
   fetchVehicleSummary,
   fetchVehicleTelemetry,
 } from "./client";
-import type { ApiBatteryCounts, ApiVehicleFleetSummary } from "./types";
+import type { ApiAppFleetSummary, ApiBatteryCounts, ApiVehicleFleetSummary } from "./types";
 import {
   aggregateStationTelemetry,
+  appPredictedAlerts,
+  appPredictiveWarning,
+  rankAlerts,
+  normaliseApp,
+  normaliseAppDetail,
+  normaliseAppTrend,
+  type AppDetailView,
+  type AppRow,
+  type AppTrendPointView,
   mergeChargerScore,
   mergeStationScore,
   normaliseAlert,
@@ -126,6 +139,30 @@ export function getBatteryTelemetryPoints(
   return load(async () =>
     normaliseBatteryTelemetry(await fetchBatteryTelemetry(batteryId, days)),
   );
+}
+
+export interface AppsPageData {
+  rows: AppRow[];
+  summary: ApiAppFleetSummary | null;
+}
+
+/** GET /apps (+ /apps/summary) — every mobile-app install cohort. */
+export function getAppsPage(): Promise<Loaded<AppsPageData>> {
+  return load(async () => {
+    const [rows, summary] = await Promise.all([
+      fetchApps(),
+      fetchAppSummary().catch(() => null),
+    ]);
+    return { rows: rows.map(normaliseApp), summary };
+  });
+}
+
+export function getAppDetail(assetId: string): Promise<Loaded<AppDetailView>> {
+  return load(async () => normaliseAppDetail(await fetchApp(assetId)));
+}
+
+export function getAppTrend(assetId: string, days = 30): Promise<Loaded<AppTrendPointView[]>> {
+  return load(async () => normaliseAppTrend(await fetchAppTrend(assetId, days)));
 }
 
 export interface VehiclesPageData {
@@ -430,12 +467,14 @@ export async function getHeaderContext(): Promise<HeaderContext> {
   if (!apiBaseUrl())
     return { locations: [], alertCount: 0, alerts: [], dataAsOf: null };
 
-  const [stations, commandCenter] = await Promise.all([
+  const [stations, commandCenter, apps] = await Promise.all([
     fetchStations().catch(() => []),
     fetchCommandCenter().catch(() => null),
+    fetchApps().catch(() => []),
   ]);
 
   const alerts = commandCenter?.top_critical_alerts ?? [];
+  const appAlerts = appPredictedAlerts(apps.map(normaliseApp));
   const timestamps = alerts
     .map((a) => a.timestamp)
     .filter(Boolean)
@@ -447,8 +486,8 @@ export async function getHeaderContext(): Promise<HeaderContext> {
       label: s.name ?? s.location ?? s.station_id,
       online: s.online,
     })),
-    alertCount: alerts.filter((a) => /CRITICAL|HIGH/i.test(a.severity)).length,
-    alerts: alerts.slice(0, 6).map(normaliseAlert),
+    alertCount: alerts.filter((a) => /CRITICAL|HIGH/i.test(a.severity)).length + appAlerts.length,
+    alerts: rankAlerts([...alerts.map(normaliseAlert), ...appAlerts]).slice(0, 6),
     dataAsOf: timestamps.length > 0 ? timestamps[timestamps.length - 1] : null,
   };
 }
@@ -466,9 +505,21 @@ export function getAssetsPage(): Promise<Loaded<AssetRow[]>> {
 export function getPredictiveWarningsPage(): Promise<
   Loaded<PredictiveWarningRow[]>
 > {
-  return load(async () =>
-    (await fetchPredictiveWarnings()).map(normalisePredictiveWarning),
-  );
+  return load(async () => {
+    // The register has no app rows, so scored app cohorts from GET /apps are
+    // appended in the same shape; a failed /apps call just leaves them out.
+    const [warnings, apps] = await Promise.all([
+      fetchPredictiveWarnings(),
+      fetchApps().catch(() => []),
+    ]);
+    return [
+      ...warnings.map(normalisePredictiveWarning),
+      ...apps.flatMap((app) => {
+        const row = appPredictiveWarning(normaliseApp(app));
+        return row ? [row] : [];
+      }),
+    ];
+  });
 }
 
 export type AlertRow = DashboardAlert;

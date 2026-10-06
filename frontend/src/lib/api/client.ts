@@ -6,6 +6,10 @@ import { cache } from "react";
 import { ENDPOINTS } from "./endpoints";
 import type {
   ApiAlert,
+  ApiApp,
+  ApiAppDetail,
+  ApiAppFleetSummary,
+  ApiAppTrendPoint,
   ApiAssetTelemetryPoint,
   ApiBattery,
   ApiBatteryDetail,
@@ -207,6 +211,18 @@ export const fetchVehicles = cache(
 
 export const fetchVehicleSummary = cache(
   (): Promise<ApiVehicleFleetSummary> => getJson<ApiVehicleFleetSummary>(ENDPOINTS.vehicleSummary()),
+);
+
+export const fetchApps = cache((): Promise<ApiApp[]> => getJson<ApiApp[]>(ENDPOINTS.apps()));
+export const fetchAppSummary = cache(
+  (): Promise<ApiAppFleetSummary> => getJson<ApiAppFleetSummary>(ENDPOINTS.appSummary()),
+);
+export const fetchApp = cache(
+  (assetId: string): Promise<ApiAppDetail> => getJson<ApiAppDetail>(ENDPOINTS.app(assetId)),
+);
+export const fetchAppTrend = cache(
+  (assetId: string, days = 30): Promise<ApiAppTrendPoint[]> =>
+    getJson<ApiAppTrendPoint[]>(ENDPOINTS.appTrend(assetId, days)),
 );
 
 export const fetchVehicle = cache(

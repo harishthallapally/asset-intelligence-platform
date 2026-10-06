@@ -10,6 +10,9 @@
 import type {
   ApiAIInsight,
   ApiAlert,
+  ApiApp,
+  ApiAppDetail,
+  ApiAppTrendPoint,
   ApiAsset,
   ApiAssetTelemetryPoint,
   ApiBattery,
@@ -1255,4 +1258,206 @@ export function normaliseDistribution(dist: ApiHealthDistribution): Bucket[] {
     count: bucket?.count ?? 0,
     pct: bucket?.percent ?? 0,
   }));
+}
+
+/** One mobile-app install cohort (GET /apps). "NOT_SCORED" cohorts don't yet
+ * have enough sessions to score, so their health/risk fields are null. */
+export interface AppRow {
+  assetId: string;
+  appId: string;
+  platform: string;
+  osMajor: number | null;
+  deviceClass: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  installCount: number | null;
+  version: string | null;
+  location: string | null;
+  sessions: number | null;
+  healthScore: number | null;
+  healthClassification: string | null;
+  riskScore: number | null;
+  riskCategoryRaw: string | null;
+  priority: string | null;
+  likelyIssue: string | null;
+  confidenceBand: string | null;
+  predictionWindow: string | null;
+  attributedVersion: string | null;
+  topExitScreen: string | null;
+  topExitReason: string | null;
+  scoredAt: string | null;
+}
+
+export function normaliseApp(row: ApiApp): AppRow {
+  return {
+    assetId: row.asset_id,
+    appId: row.app_id,
+    platform: row.platform,
+    osMajor: row.os_major,
+    deviceClass: row.device_class,
+    manufacturer: row.manufacturer,
+    model: row.model,
+    installCount: row.install_count,
+    version: row.firmware_version,
+    location: row.location,
+    sessions: row.window_sessions,
+    healthScore: row.health_score,
+    healthClassification: row.health_classification,
+    riskScore: row.risk_score,
+    riskCategoryRaw: row.risk_category,
+    priority: row.priority,
+    likelyIssue: row.likely_issue,
+    confidenceBand: row.confidence_band,
+    predictionWindow: row.prediction_window,
+    attributedVersion: row.attributed_version,
+    topExitScreen: row.top_exit_screen,
+    topExitReason: row.top_exit_reason,
+    scoredAt: row.scored_at,
+  };
+}
+
+/** The API's dimension keys, relabelled with the device subsystem each one
+ * actually measures. */
+const APP_DIMENSION_LABEL: Record<string, string> = {
+  stability: "Stability (crash/ANR)",
+  performance: "Performance (CPU)",
+  resources: "Memory",
+  network: "Network",
+  peripheral: "Bluetooth",
+  operational: "Operational",
+};
+
+export interface AppDetailView extends AppRow {
+  dimensions: { key: string; label: string; score: number }[];
+  contributingSignals: string[];
+  detectedSignals: string[];
+  sla: string | null;
+  businessImpact: string | null;
+  owner: string | null;
+  recommendedAction: string | null;
+  suggestedChecks: string[];
+  riskNote: string | null;
+  exits: {
+    total: number;
+    windowDays: number;
+    byReason: { reason: string; count: number }[];
+    byScreen: { screen: string; count: number }[];
+  } | null;
+}
+
+export function normaliseAppDetail(detail: ApiAppDetail): AppDetailView {
+  const exits = detail.exit_breakdown;
+  const sortedEntries = (record: Record<string, number>) =>
+    Object.entries(record).sort((a, b) => b[1] - a[1]);
+  return {
+    ...normaliseApp(detail),
+    dimensions: Object.entries(detail.dimension_scores ?? {}).map(([key, score]) => ({
+      key,
+      label: APP_DIMENSION_LABEL[key] ?? dimensionLabel(key),
+      score,
+    })),
+    contributingSignals: detail.contributing_signals ?? [],
+    detectedSignals: (detail.detected_signals ?? []).filter((s) => s !== "No anomalies detected"),
+    sla: detail.sla ?? null,
+    businessImpact: detail.business_impact ?? null,
+    owner: detail.owner && detail.owner !== "-" ? detail.owner : null,
+    recommendedAction: detail.recommended_action ?? null,
+    suggestedChecks: detail.suggested_checks ?? [],
+    riskNote: detail.risk_note ?? null,
+    exits: exits
+      ? {
+          total: exits.total,
+          windowDays: exits.window_days,
+          byReason: sortedEntries(exits.by_reason).map(([reason, count]) => ({ reason, count })),
+          byScreen: sortedEntries(exits.by_screen).map(([screen, count]) => ({ screen, count })),
+        }
+      : null,
+  };
+}
+
+/** One day of app-health telemetry, with rates converted to percentages and
+ * every figure rounded so chart tooltips stay readable. */
+export interface AppTrendPointView {
+  date: string;
+  crashRatePct: number | null;
+  anrRatePct: number | null;
+  oomRatePct: number | null;
+  mainThreadBlockMs: number | null;
+  peakMemoryMb: number | null;
+  apiErrorRatePct: number | null;
+  apiLatencyMs: number | null;
+  bleConnectSuccessPct: number | null;
+}
+
+const round = (value: number | null, digits: number) =>
+  value == null ? null : Number(value.toFixed(digits));
+const pct = (value: number | null, digits = 2) => round(value == null ? null : value * 100, digits);
+
+export function normaliseAppTrend(points: ApiAppTrendPoint[]): AppTrendPointView[] {
+  return points.map((p) => ({
+    date: p.date,
+    crashRatePct: pct(p.crash_rate),
+    anrRatePct: pct(p.anr_rate),
+    oomRatePct: pct(p.oom_rate),
+    mainThreadBlockMs: round(p.main_thread_block_p95_ms, 0),
+    peakMemoryMb: round(p.peak_rss_mb_p95, 0),
+    apiErrorRatePct: pct(p.api_error_rate),
+    apiLatencyMs: round(p.api_latency_p95_ms, 0),
+    bleConnectSuccessPct: pct(p.ble_connect_success_rate, 1),
+  }));
+}
+
+/** An app cohort in the predictive register's shape, so apps rank and link
+ * alongside every other asset type. Unscored cohorts have no prediction and
+ * return null. */
+export function appPredictiveWarning(app: AppRow): PredictiveWarningRow | null {
+  if (app.riskScore == null || !app.riskCategoryRaw || !app.priority) return null;
+  return {
+    assetType: "APP_MOBILE",
+    assetId: app.assetId,
+    location: app.location,
+    riskScore: app.riskScore,
+    riskCategory: riskCategory(app.riskCategoryRaw),
+    riskCategoryRaw: app.riskCategoryRaw,
+    priority: app.priority,
+    likelyIssue: app.likelyIssue ?? "No significant risk identified",
+    predictionWindow: app.predictionWindow ?? "—",
+    scoredAt: app.scoredAt ?? "",
+    href: `/software-prediction/${app.assetId}`,
+  };
+}
+
+const APP_ALERT_SEVERITY: Record<string, string> = { P1: "CRITICAL", P2: "HIGH" };
+
+/** The alert feed only carries station events, so P1/P2 app cohorts become
+ * alerts from their own real risk scores — titled "Predicted" and timed at
+ * their scoring, since they're forecasts rather than logged events. */
+export function appPredictedAlerts(apps: AppRow[]): DashboardAlert[] {
+  return apps.flatMap((app) => {
+    const severity = app.priority ? APP_ALERT_SEVERITY[app.priority] : undefined;
+    if (!severity || !app.scoredAt) return [];
+    return [
+      {
+        key: `app-${app.assetId}`,
+        title: `Predicted: ${app.likelyIssue ?? "App health risk"}`,
+        entityLabel: `App · ${app.assetId}`,
+        href: `/software-prediction/${app.assetId}`,
+        stationId: "—",
+        timestamp: app.scoredAt,
+        severity,
+        tone: alertTone(severity),
+      },
+    ];
+  });
+}
+
+const ALERT_TONE_RANK: Record<AlertTone, number> = { critical: 4, serious: 3, warning: 2, neutral: 1 };
+
+/** Most severe first, newest first within a severity. */
+export function rankAlerts<T extends { tone: AlertTone; timestamp: string }>(alerts: T[]): T[] {
+  return [...alerts].sort(
+    (a, b) =>
+      ALERT_TONE_RANK[b.tone] - ALERT_TONE_RANK[a.tone] ||
+      (new Date(b.timestamp).getTime() || 0) - (new Date(a.timestamp).getTime() || 0),
+  );
 }

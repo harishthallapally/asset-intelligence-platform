@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   Map,
   Plug,
+  Smartphone,
   Sparkles,
   Warehouse,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export function Sidebar({ alertCount }: { alertCount: number }) {
     { href: "/chargers", label: "Chargers", icon: Plug },
     { href: "/batteries", label: "Batteries", icon: BatteryCharging },
     { href: "/vehicles", label: "Vehicles", icon: Bike },
+    { href: "/software-prediction", label: "Software Prediction", icon: Smartphone },
     { href: "/ai-predictions", label: "AI Predictions", icon: Sparkles },
     { href: "/alerts", label: "Alerts", icon: Bell, badge: alertCount },
     { href: "/map-view", label: "Map View", icon: Map },
@@ -40,15 +42,19 @@ export function Sidebar({ alertCount }: { alertCount: number }) {
 
   return (
     <aside className="flex h-screen w-[212px] flex-none flex-col border-r border-[var(--border-hairline)] bg-[var(--surface-1)]">
-      <Link href="/" className="flex items-center px-5 py-5" aria-label="Circumcircle Innovations — dashboard">
-        <Image
-          src="/circumcircle-logo.png"
-          alt="Circumcircle Innovations"
-          width={312}
-          height={107}
-          className="h-auto w-full"
-          priority
-        />
+      <Link href="/" className="flex items-center px-5 py-5" aria-label="Reliance — dashboard">
+        {/* The source image is a square with wide white margins; scaling it
+            inside a cropped box shows just the mark and wordmark. */}
+        <span className="relative block h-16 aspect-[15/8] overflow-hidden">
+          <Image
+            src="/reliance_logo.png"
+            alt="Reliance"
+            fill
+            sizes="120px"
+            className="scale-[1.4] object-cover"
+            priority
+          />
+        </span>
       </Link>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">

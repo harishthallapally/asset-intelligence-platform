@@ -1,4 +1,4 @@
-import { BatteryCharging, Bike, Plug, Warehouse } from "lucide-react";
+import { BatteryCharging, Bike, Plug, Smartphone, Warehouse } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
 import { Panel } from "@/components/ui/Panel";
 import { StatCard, type RiskItem } from "@/components/ui/StatCard";
@@ -17,7 +17,7 @@ import {
 } from "@/components/dashboard/TopRiskAssets";
 import { getDashboardData } from "@/lib/api/dashboard";
 import { getTopRiskAssets } from "@/lib/api/resources";
-import { operationsRiskHref } from "@/lib/api/normalise";
+import { appPredictedAlerts, operationsRiskHref, rankAlerts } from "@/lib/api/normalise";
 
 /** HIGH or CRITICAL — checked directly against the API's own risk_category
  * string (GET /operations/risk) rather than a score threshold, so "what
@@ -37,7 +37,7 @@ export default async function DashboardPage({
   // The header's date control writes the trend window here.
   const { days } = await searchParams;
   const trendDays = Math.min(365, Math.max(1, Number(days) || 7));
-  const [{ data, stations, chargers }, topRiskRows] = await Promise.all([
+  const [{ data, stations, chargers, apps }, topRiskRows] = await Promise.all([
     getDashboardData(trendDays),
     // GET /operations/risk's own cross-asset-type ranking, mix=balanced so
     // batteries (3,124 of them) don't crowd out stations/chargers/docks (26,
@@ -93,7 +93,25 @@ export default async function DashboardPage({
     DOCK: "dock",
     VEHICLE: "vehicle",
   };
-  const topRiskAssets: RankedAsset[] = topRiskRows.flatMap((row) => {
+  // GET /operations/risk has no app rows, so the two riskiest scored app
+  // cohorts join the ranking here — the same "top 2 per type" the balanced
+  // mix gives every other asset type.
+  const topRiskApps: RankedAsset[] = apps.rows
+    .filter((app) => app.riskScore != null)
+    .sort((a, b) => b.riskScore! - a.riskScore!)
+    .slice(0, 2)
+    .map((app) => ({
+      id: app.assetId,
+      key: `app-${app.assetId}`,
+      kind: "app",
+      href: `/software-prediction/${app.assetId}`,
+      issue: app.likelyIssue ?? "No issue reported",
+      location: app.location ?? "",
+      risk: app.riskScore!,
+      tag: app.priority ?? "",
+    }));
+
+  const topRiskAssets: RankedAsset[] = [...topRiskApps, ...topRiskRows.flatMap((row) => {
     const kind = KIND_BY_ASSET_TYPE[row.assetType.toUpperCase()];
     const href = operationsRiskHref(row);
     if (!kind || !href) return [];
@@ -109,7 +127,7 @@ export default async function DashboardPage({
         tag: row.priority,
       },
     ];
-  });
+  })];
 
   const batteryItems: RiskItem[] = data.atRisk.map((row) => ({
     id: row.batteryId,
@@ -144,18 +162,33 @@ export default async function DashboardPage({
       tag: vehicle.priority ?? undefined,
     }));
 
+  const appItems: RiskItem[] = apps.rows
+    .filter((app) => {
+      const category = app.riskCategoryRaw?.toUpperCase();
+      return app.riskScore != null && (category === "HIGH" || category === "CRITICAL");
+    })
+    .map((app) => ({
+      id: app.assetId,
+      href: `/software-prediction/${app.assetId}`,
+      detail: app.likelyIssue ?? "No issue reported",
+      risk: app.riskScore!,
+      tag: app.priority ?? undefined,
+    }));
+
+  const cardCount = 3 + (data.vehicles ? 1 : 0) + (apps.summary ? 1 : 0);
+  const cardGrid =
+    cardCount === 5 ? "lg:grid-cols-5" : cardCount === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3";
+
   return (
     <PageShell
       title="Dashboard"
-      subtitle="Overview of Stations, Chargers, Batteries & Vehicles"
+      subtitle="Overview of Stations, Chargers, Batteries, Vehicles & Apps"
     >
       <div className="flex flex-col gap-3">
         <DataSourceBadge source={data.source} />
         <CriticalAlertBanner stations={stations} />
 
-        <div
-          className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${data.vehicles ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}
-        >
+        <div className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${cardGrid}`}>
           <StatCard
             icon={Warehouse}
             iconBg="color-mix(in srgb, var(--series-7) 12%, transparent)"
@@ -245,6 +278,30 @@ export default async function DashboardPage({
               emptyMessage="No vehicle above the Low risk band."
             />
           )}
+          {apps.summary && (
+            <StatCard
+              icon={Smartphone}
+              iconBg="color-mix(in srgb, var(--series-4) 12%, transparent)"
+              iconColor="var(--series-4)"
+              label="Apps"
+              value={apps.summary.total}
+              href="/software-prediction"
+              breakdown={[
+                ...(apps.summary.average_health_score != null
+                  ? [
+                      {
+                        label: "Health",
+                        value: `${Math.round(apps.summary.average_health_score)}/100`,
+                        tone: "good" as const,
+                      },
+                    ]
+                  : []),
+                { label: "High risk", value: apps.summary.high_risk_count, tone: "warning" as const },
+              ]}
+              items={appItems}
+              emptyMessage="No app cohort above the Low risk band."
+            />
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
@@ -262,7 +319,9 @@ export default async function DashboardPage({
             className="lg:col-span-5"
             action={<ViewAllLink href="/alerts" />}
           >
-            <AlertsPanel alerts={data.alerts} />
+            <AlertsPanel
+              alerts={rankAlerts([...data.alerts, ...appPredictedAlerts(apps.rows)]).slice(0, 5)}
+            />
           </Panel>
         </div>
 

@@ -52,6 +52,12 @@ export const ENDPOINTS = {
   vehiclesTopRisk: (sortBy = "risk", order: "asc" | "desc" = "desc", limit?: number) =>
     `/vehicles/risk/top${qs({ sort_by: sortBy, order, limit })}`,
 
+  // --- Software assets (mobile app install cohorts) ---
+  apps: () => "/apps",
+  appSummary: () => "/apps/summary",
+  app: (assetId: string) => `/apps/${id(assetId)}`,
+  appTrend: (assetId: string, days = 30) => `/apps/${id(assetId)}/trend${qs({ days })}`,
+
   // --- Stations & chargers ---
   stations: () => "/stations",
   stationsSummary: () => "/stations/summary",

@@ -60,7 +60,8 @@ export default async function AiPredictionsPage() {
             <span className="font-semibold text-text-primary">Predictive Risk / Early Warning.</span> These
             scores express the likelihood of an operational issue developing inside the prediction window,
             based on recent telemetry trends — across every asset type the platform scores (batteries,
-            stations, docks and chargers). They are not confirmed failure predictions.
+            stations, docks, chargers, vehicles and the iOS/Android app). They are not confirmed failure
+            predictions.
           </p>
         </div>
       </div>

@@ -12,6 +12,8 @@
 import {
   ApiUnavailableError,
   apiBaseUrl,
+  fetchApps,
+  fetchAppSummary,
   fetchBatteryHealthTrend,
   fetchChargers,
   fetchCommandCenter,
@@ -26,6 +28,7 @@ import { buildDemoCommandCenter } from "./demoSource";
 import {
   mergeChargerOperationsRisk,
   mergeStationOperationsRisk,
+  normaliseApp,
   normaliseCharger,
   normaliseCommandCenter,
   normaliseDistribution,
@@ -33,16 +36,21 @@ import {
   normaliseStation,
   normaliseTrend,
   normaliseVehicle,
+  type AppRow,
   type ChargerRow,
   type DashboardData,
   type StationRow,
 } from "./normalise";
+import type { ApiAppFleetSummary } from "./types";
 
 export interface DashboardResult {
   data: DashboardData;
   /** Individual stations and chargers, so the KPI cards can rank them. */
   stations: StationRow[];
   chargers: ChargerRow[];
+  /** iOS/Android app cohorts — same registry and summary as the Software
+   * Prediction page. */
+  apps: { summary: ApiAppFleetSummary | null; rows: AppRow[] };
   /** Why the live service was not used, when it wasn't. */
   fallbackReason: string | null;
 }
@@ -58,6 +66,7 @@ function demoResult(reason: string): DashboardResult {
     },
     stations: [],
     chargers: [],
+    apps: { summary: null, rows: [] },
     fallbackReason: reason,
   };
 }
@@ -79,6 +88,8 @@ export async function getDashboardData(
       chargerRiskItems,
       vehicleRows,
       vehicleSummary,
+      appRows,
+      appSummary,
     ] = await Promise.all([
       fetchCommandCenter(),
       fetchHealthDistribution().catch(() => null),
@@ -97,6 +108,8 @@ export async function getDashboardData(
       // snapshot which can be calculated or cached on a different schedule.
       fetchVehicles().catch(() => []),
       fetchVehicleSummary().catch(() => null),
+      fetchApps().catch(() => []),
+      fetchAppSummary().catch(() => null),
     ]);
 
     const data = normaliseCommandCenter(payload, "api");
@@ -174,6 +187,7 @@ export async function getDashboardData(
             ),
           ),
         ),
+      apps: { summary: appSummary, rows: appRows.map(normaliseApp) },
       fallbackReason: null,
     };
   } catch (error) {

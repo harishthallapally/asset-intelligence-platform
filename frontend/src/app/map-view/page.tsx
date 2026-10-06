@@ -49,6 +49,7 @@ const KIND_BY_ASSET_TYPE: Record<string, RankedAsset["kind"]> = {
   STATION: "station",
   DOCK: "dock",
   "2W_EV": "vehicle",
+  APP_MOBILE: "app",
 };
 
 /** One P1 asset's marker/list entry — the common fields needed to place and
@@ -114,8 +115,8 @@ export default async function MapViewPage() {
     .sort((a, b) => b[1].riskSum / b[1].stations - a[1].riskSum / a[1].stations)
     .slice(0, 5);
 
-  // Every asset currently at P1. Stations, vehicles, batteries and docks come
-  // from GET /operations/predictive-warnings; chargers come from GET /chargers
+  // Every asset currently at P1. Stations, vehicles, batteries, docks and apps come
+  // from the predictive register (apps merged in from GET /apps); chargers come from GET /chargers
   // instead, because the register's CHARGER rows are dock-level ids scored
   // differently and never match the priorities the Chargers screen shows.
   const locationByStation = new Map(stations.map((s) => [s.stationId, s.name]));
@@ -152,7 +153,7 @@ export default async function MapViewPage() {
   const p1Assets = [...p1Register, ...p1Chargers].sort((a, b) => b.riskScore - a.riskScore);
 
   // Side list: the riskiest P1 assets, capped per type (5 in total).
-  const quota: Partial<Record<RankedAsset["kind"], number>> = { station: 2, vehicle: 2, battery: 1 };
+  const quota: Partial<Record<RankedAsset["kind"], number>> = { station: 2, vehicle: 1, battery: 1, app: 1 };
   const taken = new Map<RankedAsset["kind"], number>();
   const topAssets: RankedAsset[] = p1Assets
     .filter((c) => {

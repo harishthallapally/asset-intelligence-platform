@@ -11,6 +11,7 @@ const TYPE_LABEL: Record<string, string> = {
   DOCK: "Dock",
   CHARGER: "Charger",
   "2W_EV": "Vehicle",
+  APP_MOBILE: "App",
 };
 
 export function PredictiveWarningsTable({ rows }: { rows: PredictiveWarningRow[] }) {

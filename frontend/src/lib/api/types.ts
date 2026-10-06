@@ -646,3 +646,84 @@ export interface ApiDemoInjectResult {
   likely_issue: string;
   priority: string;
 }
+
+/** GET /apps — one mobile-app install cohort (app × platform × OS × device
+ * class × brand), scored like any other asset. Unscored cohorts carry nulls. */
+export interface ApiApp {
+  asset_id: string;
+  app_id: string;
+  platform: string;
+  os_major: number | null;
+  device_class: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  install_count: number | null;
+  firmware_version: string | null;
+  location: string | null;
+  last_seen: string | null;
+  health_score: number | null;
+  health_classification: string | null;
+  window_sessions: number | null;
+  risk_score: number | null;
+  risk_category: string | null;
+  priority: string | null;
+  likely_issue: string | null;
+  confidence_band: string | null;
+  prediction_window: string | null;
+  attributed_version: string | null;
+  top_exit_screen: string | null;
+  top_exit_reason: string | null;
+  scored_at: string | null;
+}
+
+export interface ApiAppExitBreakdown {
+  total: number;
+  window_days: number;
+  by_reason: Record<string, number>;
+  by_screen: Record<string, number>;
+  foreground_share: number | null;
+}
+
+export interface ApiAppDetail extends ApiApp {
+  dimension_scores?: Record<string, number> | null;
+  contributing_signals?: string[] | null;
+  detected_signals?: string[] | null;
+  sla?: string | null;
+  business_impact?: string | null;
+  owner?: string | null;
+  recommended_action?: string | null;
+  suggested_checks?: string[] | null;
+  risk_note?: string | null;
+  exit_breakdown?: ApiAppExitBreakdown | null;
+}
+
+export interface ApiAppFleetSummary {
+  total: number;
+  healthy: number;
+  watch: number;
+  at_risk: number;
+  critical: number;
+  not_scored: number;
+  high_risk_count: number;
+  predicted_failure_count: number;
+  average_health_score: number | null;
+  by_platform: Record<string, number>;
+  total_installs: number;
+}
+
+/** GET /apps/{id}/trend — one day of the cohort's app-health telemetry.
+ * Rates are fractions (0.0012 = 0.12%). */
+export interface ApiAppTrendPoint {
+  date: string;
+  sessions: number;
+  crash_rate: number | null;
+  anr_rate: number | null;
+  oom_rate: number | null;
+  main_thread_block_p95_ms: number | null;
+  peak_rss_mb_p95: number | null;
+  memory_pressure_critical_share: number | null;
+  api_error_rate: number | null;
+  api_latency_p95_ms: number | null;
+  ble_connect_success_rate: number | null;
+  ble_gatt_error_rate: number | null;
+}

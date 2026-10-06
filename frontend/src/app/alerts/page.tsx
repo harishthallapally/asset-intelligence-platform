@@ -2,10 +2,14 @@ import { PageShell } from "@/components/layout/PageShell";
 import { Panel } from "@/components/ui/Panel";
 import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { AlertsTable } from "@/components/alerts/AlertsTable";
-import { getOperationsAlertsPage } from "@/lib/api/resources";
+import { appPredictedAlerts } from "@/lib/api/normalise";
+import { getAppsPage, getOperationsAlertsPage } from "@/lib/api/resources";
 
 export default async function AlertsPage() {
-  const { data: alerts, error } = await getOperationsAlertsPage(200);
+  const [{ data: alerts, error }, { data: apps }] = await Promise.all([
+    getOperationsAlertsPage(200),
+    getAppsPage(),
+  ]);
 
   if (error || !alerts) {
     return (
@@ -15,10 +19,18 @@ export default async function AlertsPage() {
     );
   }
 
+  const appAlerts = appPredictedAlerts(apps?.rows ?? []);
+  const rows = [...alerts, ...appAlerts];
+
   return (
-    <PageShell title="Alerts" subtitle={`${alerts.length.toLocaleString()} recent alerts across the fleet`}>
+    <PageShell
+      title="Alerts"
+      subtitle={`${rows.length.toLocaleString()} recent alerts across the fleet${
+        appAlerts.length ? ` · ${appAlerts.length} predicted app alerts` : ""
+      }`}
+    >
       <Panel>
-        <AlertsTable alerts={alerts} />
+        <AlertsTable alerts={rows} />
       </Panel>
     </PageShell>
   );
