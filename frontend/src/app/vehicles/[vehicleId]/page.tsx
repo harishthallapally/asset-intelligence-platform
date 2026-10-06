@@ -1,3 +1,5 @@
+import { fitToRange } from "@/lib/dateRange";
+import { selectedDays } from "@/lib/selectedDays";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -47,9 +49,10 @@ export default async function VehicleDetailPage({
   params: Promise<{ vehicleId: string }>;
 }) {
   const { vehicleId } = await params;
+  const days = await selectedDays();
   const [{ data, error }, { data: telemetry }] = await Promise.all([
     getVehicleDetail(vehicleId),
-    getVehicleTelemetryPoints(vehicleId, 14),
+    getVehicleTelemetryPoints(vehicleId, days),
   ]);
 
   if (error || !data) {
@@ -64,7 +67,7 @@ export default async function VehicleDetailPage({
   }
 
   const vehicle = data;
-  const telemetryRows = telemetry ?? [];
+  const telemetryRows = fitToRange(telemetry ?? [], days);
 
   const scoredLabel = vehicle.scoredAt ? formatScoredAt(vehicle.scoredAt) : "—";
   const subtitle = vehicle.equipment.firmwareVersion ? `v${vehicle.equipment.firmwareVersion}` : "";
@@ -356,7 +359,7 @@ export default async function VehicleDetailPage({
           </Panel>
         </div>
 
-        {telemetryRows.length > 0 && (
+        {(telemetry ?? []).length > 0 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Battery Temperature" titleNote="(daily avg, °C)">
               <TelemetryChart data={telemetryRows} dataKey="batteryTemp" color="var(--status-critical)" unit="°C" gradientId="vehicle-temp" />

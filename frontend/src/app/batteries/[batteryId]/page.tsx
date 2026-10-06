@@ -1,3 +1,5 @@
+import { fitToRange } from "@/lib/dateRange";
+import { selectedDays } from "@/lib/selectedDays";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -56,9 +58,10 @@ export default async function BatteryDetailPage({
   params: Promise<{ batteryId: string }>;
 }) {
   const { batteryId } = await params;
+  const days = await selectedDays();
   const [{ data: battery, error }, { data: telemetry }] = await Promise.all([
     getBatteryDetail(batteryId),
-    getBatteryTelemetryPoints(batteryId, 14),
+    getBatteryTelemetryPoints(batteryId, days),
   ]);
 
   if (error || !battery) {
@@ -70,7 +73,7 @@ export default async function BatteryDetailPage({
   }
 
   const scoredLabel = formatScoredAt(battery.scoredAt);
-  const telemetryRows = telemetry ?? [];
+  const telemetryRows = fitToRange(telemetry ?? [], days);
 
   const { manufactureDate, warrantyMonths, warrantyStatus } = battery.equipment;
   const coverageEnd =
@@ -294,7 +297,7 @@ export default async function BatteryDetailPage({
           </Panel>
         </div>
 
-        {telemetryRows.length > 0 && (
+        {(telemetry ?? []).length > 0 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Battery Temperature" titleNote="(daily avg, °C)">
               <TelemetryChart data={telemetryRows} dataKey="temperature" color="var(--status-critical)" unit="°C" gradientId="battery-temp" />

@@ -1,5 +1,6 @@
 import { Topbar } from "./Topbar";
 import { getHeaderContext } from "@/lib/api/resources";
+import { selectedDays } from "@/lib/selectedDays";
 
 /**
  * Wraps a page with the shared header. Locations, alerts and the data
@@ -15,7 +16,7 @@ export async function PageShell({
   subtitle: string;
   children: React.ReactNode;
 }) {
-  const header = await getHeaderContext();
+  const [header, days] = await Promise.all([getHeaderContext(), selectedDays()]);
 
   return (
     // No min-h-full/flex-1 here: this block's height must stay intrinsic to
@@ -30,6 +31,7 @@ export async function PageShell({
         alerts={header.alerts}
         locations={header.locations}
         dataAsOf={header.dataAsOf}
+        days={days}
       />
       <div className="px-5 pb-3 pt-3">{children}</div>
     </div>

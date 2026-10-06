@@ -303,6 +303,7 @@ function dockAssetIdsForStation(
  */
 export function getStationDetail(
   stationId: string,
+  days = 14,
 ): Promise<Loaded<StationDetailData>> {
   return load(async () => {
     const [stations, scoring, assets] = await Promise.all([
@@ -321,7 +322,7 @@ export function getStationDetail(
     const dockAssetIds = dockAssetIdsForStation(stationId, assets);
     const perDockTelemetry = await Promise.all(
       dockAssetIds.map((assetId) =>
-        fetchAssetTelemetry(assetId, 14).catch(() => []),
+        fetchAssetTelemetry(assetId, days).catch(() => []),
       ),
     );
 
@@ -393,6 +394,7 @@ export interface ChargerDetailData {
 export function getChargerDetail(
   chargerId: string,
   stationId?: string,
+  days = 14,
 ): Promise<Loaded<ChargerDetailData>> {
   return load(async () => {
     const [chargers, stations] = await Promise.all([
@@ -425,7 +427,7 @@ export function getChargerDetail(
         .then(normaliseChargerDetail)
         .catch(() => null),
       dockAssetId
-        ? fetchAssetTelemetry(dockAssetId, 14).catch(() => [])
+        ? fetchAssetTelemetry(dockAssetId, days).catch(() => [])
         : Promise.resolve([]),
     ]);
 

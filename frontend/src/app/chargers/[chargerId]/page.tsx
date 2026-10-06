@@ -1,3 +1,5 @@
+import { fitToRange } from "@/lib/dateRange";
+import { selectedDays } from "@/lib/selectedDays";
 import Link from "next/link";
 import { ArrowLeft, BatteryCharging, LayoutGrid, Plug, Sparkles, Warehouse } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -64,7 +66,8 @@ export default async function ChargerDetailPage({
 }) {
   const { chargerId } = await params;
   const { station: stationId } = await searchParams;
-  const { data, error } = await getChargerDetail(chargerId, stationId);
+  const days = await selectedDays();
+  const { data, error } = await getChargerDetail(chargerId, stationId, days);
 
   if (error || !data) {
     return (
@@ -74,7 +77,8 @@ export default async function ChargerDetailPage({
     );
   }
 
-  const { charger, scoring, station, telemetry } = data;
+  const { charger, scoring, station, telemetry: rawTelemetry } = data;
+  const telemetry = fitToRange(rawTelemetry, days);
   const scoredLabel = scoring ? formatScoredAt(scoring.scoredAt) : null;
   const subtitle = scoring?.equipment.firmwareVersion
     ? `Dock ${charger.dockId} · v${scoring.equipment.firmwareVersion}`
@@ -448,7 +452,7 @@ export default async function ChargerDetailPage({
           </Panel>
         )}
 
-        {telemetry.length > 0 && (
+        {rawTelemetry.length > 0 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Charger Temperature" titleNote="(daily avg, °C)">
               <TelemetryChart data={telemetry} dataKey="temperature" color="var(--status-critical)" unit="°C" gradientId="charger-temp" />

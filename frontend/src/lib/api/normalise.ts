@@ -75,10 +75,11 @@ export interface AtRiskRow {
 
 export interface TrendPoint {
   label: string;
-  /** Percentages, matching the chart's "% of batteries" axis. */
-  healthy: number;
-  warning: number;
-  critical: number;
+  /** Percentages, matching the chart's "% of batteries" axis. Null on a
+   * day inside the selected range that the API has no data for. */
+  healthy: number | null;
+  warning: number | null;
+  critical: number | null;
 }
 
 export interface DashboardData {
@@ -222,14 +223,14 @@ function trendLabel(date: string): string {
 }
 
 export function normaliseTrend(
-  points: ApiHealthTrendPoint[] | null | undefined,
+  points: (Partial<ApiHealthTrendPoint> & { date: string })[] | null | undefined,
 ): TrendPoint[] | null {
   if (!points || points.length === 0) return null;
   return points.map((point) => ({
     label: trendLabel(point.date),
-    healthy: point.healthy_percent,
-    warning: point.warning_percent,
-    critical: point.critical_percent,
+    healthy: point.healthy_percent ?? null,
+    warning: point.warning_percent ?? null,
+    critical: point.critical_percent ?? null,
   }));
 }
 

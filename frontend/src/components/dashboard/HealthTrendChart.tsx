@@ -12,6 +12,14 @@ const SERIES = [
 ] as const;
 
 export function HealthTrendChart({ data }: { data: TrendPoint[] }) {
+  if (!data.some((point) => point.healthy != null)) {
+    return (
+      <div className="flex h-full min-h-[210px] items-center justify-center text-[12.5px] text-text-muted">
+        No data in the selected date range.
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-[210px] flex-col">
       {/* Rendered as markup rather than Recharts' <Legend>, which sorts its

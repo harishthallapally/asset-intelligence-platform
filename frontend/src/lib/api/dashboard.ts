@@ -25,6 +25,7 @@ import {
   fetchVehicles,
 } from "./client";
 import { buildDemoCommandCenter } from "./demoSource";
+import { fitToRange } from "../dateRange";
 import {
   mergeChargerOperationsRisk,
   mergeStationOperationsRisk,
@@ -152,7 +153,7 @@ export async function getDashboardData(
               predictedFailures: riskSummary.predicted_failures.count,
             }
           : null,
-        healthTrend: normaliseTrend(trend) ?? data.healthTrend,
+        healthTrend: trend && trend.length > 0 ? normaliseTrend(fitToRange(trend, trendDays)) : data.healthTrend,
         vehicles: vehicleSummary
           ? {
               total: vehicleSummary.total,

@@ -16,6 +16,7 @@ import {
   type RankedAsset,
 } from "@/components/dashboard/TopRiskAssets";
 import { getDashboardData } from "@/lib/api/dashboard";
+import { selectedDays } from "@/lib/selectedDays";
 import { getTopRiskAssets } from "@/lib/api/resources";
 import { appPredictedAlerts, operationsRiskHref, rankAlerts } from "@/lib/api/normalise";
 
@@ -29,14 +30,9 @@ function isHighRisk(row: { riskCategoryRaw: string | null }): boolean {
   return category === "HIGH" || category === "CRITICAL";
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ days?: string }>;
-}) {
-  // The header's date control writes the trend window here.
-  const { days } = await searchParams;
-  const trendDays = Math.min(365, Math.max(1, Number(days) || 7));
+export default async function DashboardPage() {
+  // The header's date range sets the trend window.
+  const trendDays = await selectedDays();
   const [{ data, stations, chargers, apps }, topRiskRows] = await Promise.all([
     getDashboardData(trendDays),
     // GET /operations/risk's own cross-asset-type ranking, mix=balanced so

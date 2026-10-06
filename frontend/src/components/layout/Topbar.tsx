@@ -13,6 +13,7 @@ export function Topbar({
   alerts = [],
   locations = [],
   dataAsOf = null,
+  days,
 }: {
   title: string;
   subtitle: string;
@@ -20,6 +21,7 @@ export function Topbar({
   alerts?: HeaderAlert[];
   locations?: LocationOption[];
   dataAsOf?: string | null;
+  days: number;
 }) {
   return (
     <header className="sticky top-0 z-30 flex min-h-[58px] flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-hairline)] bg-[var(--surface-1)] px-5 py-2">
@@ -44,7 +46,7 @@ export function Topbar({
             </span>
           }
         >
-          <DateRangePicker dataAsOf={dataAsOf} />
+          <DateRangePicker dataAsOf={dataAsOf} days={days} />
         </Suspense>
 
         <AlertBell count={alertCount} alerts={alerts} />

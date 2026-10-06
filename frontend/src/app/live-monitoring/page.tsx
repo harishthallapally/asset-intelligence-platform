@@ -1,3 +1,5 @@
+import { fitToRange } from "@/lib/dateRange";
+import { selectedDays } from "@/lib/selectedDays";
 import Link from "next/link";
 import { Activity, AlertTriangle, Plug, Thermometer } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -16,6 +18,7 @@ export default async function LiveMonitoringPage({
   searchParams: Promise<{ station?: string }>;
 }) {
   const { station: stationId } = await searchParams;
+  const days = await selectedDays();
   const { data: allAssets, error } = await getAssetsPage();
 
   if (error || !allAssets) {
@@ -36,7 +39,7 @@ export default async function LiveMonitoringPage({
   // per-second/minute live stream, only these daily aggregates (see the note
   // below the charts), so this is the closest honest thing to "live".
   const telemetryByAsset = await Promise.all(
-    topAtRisk.map((asset) => getAssetTelemetryPoints(asset.assetId, 14)),
+    topAtRisk.map((asset) => getAssetTelemetryPoints(asset.assetId, days)),
   );
 
   const subtitle = stationId
@@ -93,7 +96,7 @@ export default async function LiveMonitoringPage({
                   </div>
                   {telemetryByAsset[idx].data && telemetryByAsset[idx].data!.length > 0 ? (
                     <TelemetryChart
-                      data={telemetryByAsset[idx].data!}
+                      data={fitToRange(telemetryByAsset[idx].data!, days)}
                       dataKey="temperature"
                       color="var(--status-critical)"
                       unit="°C"

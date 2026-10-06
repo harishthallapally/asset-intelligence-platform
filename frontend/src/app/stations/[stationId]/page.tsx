@@ -1,3 +1,5 @@
+import { fitToRange } from "@/lib/dateRange";
+import { selectedDays } from "@/lib/selectedDays";
 import Link from "next/link";
 import { ArrowLeft, LayoutGrid, MapPin, Plug, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -27,7 +29,8 @@ export default async function StationDetailPage({
   params: Promise<{ stationId: string }>;
 }) {
   const { stationId } = await params;
-  const { data, error } = await getStationDetail(stationId);
+  const days = await selectedDays();
+  const { data, error } = await getStationDetail(stationId, days);
 
   if (error || !data) {
     return (
@@ -37,7 +40,8 @@ export default async function StationDetailPage({
     );
   }
 
-  const { station, scoring, telemetry } = data;
+  const { station, scoring, telemetry: rawTelemetry } = data;
+  const telemetry = fitToRange(rawTelemetry, days);
   const scoredLabel = scoring ? formatScoredAt(scoring.scoredAt) : null;
   const location = scoring?.location ?? station.name;
 
@@ -264,7 +268,7 @@ export default async function StationDetailPage({
             per-dock (GET /assets/{id}/telemetry). This is the mean of every
             dock at this station on each date (see aggregateStationTelemetry),
             so it renders only when at least one dock's history resolved. */}
-        {telemetry.length > 0 && (
+        {rawTelemetry.length > 0 && (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Average Dock Temperature" titleNote="(daily avg across docks, °C)">
               <TelemetryChart data={telemetry} dataKey="temperature" color="var(--status-critical)" unit="°C" gradientId="station-temp" />

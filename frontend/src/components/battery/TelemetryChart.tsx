@@ -17,6 +17,14 @@ export function TelemetryChart<T extends { date: string }>({
   unit: string;
   gradientId: string;
 }) {
+  if (!data.some((point) => typeof point[dataKey] === "number")) {
+    return (
+      <div className="flex h-[168px] items-center justify-center text-[12.5px] text-text-muted">
+        No data in the selected date range.
+      </div>
+    );
+  }
+
   return (
     <div className="h-[168px]">
       <ResponsiveContainer width="100%" height="100%">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, Info, Loader2 } from "lucide-react";
+import { DAYS_COOKIE } from "@/lib/dateRange";
 
 const PRESETS = [
   { days: 7, label: "Last 7 days" },
@@ -29,6 +30,10 @@ function daysBetween(from: Date, to: Date): number {
   return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / 86_400_000);
 }
 
+function saveDays(days: number) {
+  document.cookie = `${DAYS_COOKIE}=${days}; path=/; max-age=31536000; samesite=lax`;
+}
+
 /** Monday-first grid for the given month, padded to whole weeks. */
 function monthGrid(month: Date): (Date | null)[] {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -45,20 +50,20 @@ function monthGrid(month: Date): (Date | null)[] {
 /**
  * Date control for the header.
  *
- * The platform exposes history as a rolling window (a `days` count) rather than
- * arbitrary date ranges, so picking a date sets the window from that date up to
- * the latest data. The choice is written to the `?days=` query parameter, which
- * the dashboard reads when it requests the trend series.
+ * The window always ends today; picking a date sets how far back it starts.
+ * The choice is saved in a cookie, so it carries across pages, and every trend
+ * chart lays its data out against this window.
  */
-export function DateRangePicker({ dataAsOf }: { dataAsOf: string | null }) {
+export function DateRangePicker({ dataAsOf, days }: { dataAsOf: string | null; days: number }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentDays = Number(searchParams.get("days")) || 7;
-  const latest = useMemo(() => {
+  const currentDays = days;
+  const latest = useMemo(() => startOfDay(new Date()), []);
+  const dataEnd = useMemo(() => {
     const parsed = dataAsOf ? new Date(dataAsOf) : null;
-    return parsed && !Number.isNaN(parsed.getTime()) ? startOfDay(parsed) : startOfDay(new Date());
+    return parsed && !Number.isNaN(parsed.getTime()) ? startOfDay(parsed) : null;
   }, [dataAsOf]);
 
   const [open, setOpen] = useState(false);
@@ -91,12 +96,14 @@ export function DateRangePicker({ dataAsOf }: { dataAsOf: string | null }) {
 
   function apply(days: number) {
     const clamped = Math.min(365, Math.max(1, days));
+    saveDays(clamped);
+    // Older links may still carry ?days=; drop it so the URL matches the range.
     const params = new URLSearchParams(searchParams.toString());
-    if (clamped === 7) params.delete("days");
-    else params.set("days", String(clamped));
+    params.delete("days");
     const query = params.toString();
     startTransition(() => {
-      router.push(query ? `${pathname}?${query}` : pathname);
+      router.replace(query ? `${pathname}?${query}` : pathname);
+      router.refresh();
     });
     setOpen(false);
   }
@@ -199,9 +206,12 @@ export function DateRangePicker({ dataAsOf }: { dataAsOf: string | null }) {
           <p className="mt-3 flex gap-1.5 border-t border-[var(--border-hairline)] pt-2.5 text-[11px] leading-relaxed text-text-muted">
             <Info size={12} className="mt-0.5 flex-none" />
             <span>
-              History is served as a rolling window, so this sets how far back the trend looks. Current
-              health, risk and alerts always reflect the latest scoring run
-              {dataAsOf ? ` (${latest.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})` : ""}.
+              Charts show this range up to today. Current health, risk and alerts reflect the latest
+              scoring run
+              {dataEnd
+                ? ` (${dataEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}); days after that have no data yet`
+                : ""}
+              .
             </span>
           </p>
         </div>
