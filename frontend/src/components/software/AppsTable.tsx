@@ -134,7 +134,6 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
         r.manufacturer ?? "",
         r.model ?? "",
         r.version ?? "",
-        r.location ?? "",
         r.likelyIssue ?? "",
         r.priority ?? "",
       ]}

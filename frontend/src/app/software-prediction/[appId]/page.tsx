@@ -66,12 +66,11 @@ export default async function AppDetailPage({ params }: { params: Promise<{ appI
         </Link>
 
         <Panel>
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4 xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-4 xl:grid-cols-7">
             <Fact name="Platform">{platformLabel(app)}</Fact>
             <Fact name="Device">{[app.manufacturer, app.model].filter(Boolean).join(" · ") || "—"}</Fact>
             <Fact name="App Version">{app.version ?? "—"}</Fact>
             <Fact name="Installs">{app.installCount?.toLocaleString("en-IN") ?? "—"}</Fact>
-            <Fact name="Location">{app.location ?? "—"}</Fact>
             <div>
               <div className="text-[12px] text-text-muted">Condition</div>
               <div
