@@ -36,14 +36,18 @@ export function HealthTrendChart({ data }: { data: TrendPoint[] }) {
 
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 0 }}>
+          <LineChart data={data} margin={{ top: 6, right: 20, bottom: 0, left: 0 }}>
             <CartesianGrid stroke="var(--gridline)" vertical={false} />
             <XAxis
               dataKey="label"
               axisLine={{ stroke: "var(--gridline)" }}
               tickLine={false}
               tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-              padding={{ left: 10, right: 10 }}
+              // No axis padding: the lines should run flush to the plot's
+              // true edges rather than leaving a gridded gap at either end.
+              // The right margin above gives the last tick's label room to
+              // render in full outside the grid, where empty space reads as
+              // a normal label gutter rather than missing chart.
             />
             <YAxis
               domain={[0, 100]}

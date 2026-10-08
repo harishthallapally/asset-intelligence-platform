@@ -42,6 +42,28 @@ export function daysInRange(from: string, to: string): string[] {
   return Array.from({ length: spanDays(from, to) }, (_, i) => addDays(from, i));
 }
 
+export function todayYmd(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * How many trailing days to ask a "last N days" endpoint for so its window is
+ * guaranteed to reach back to `from`.
+ *
+ * These "last N days" endpoints don't all anchor to the same "now": some
+ * count back from the platform's own latest scored date, others from the
+ * service's real wall-clock time — e.g. /assets/{id}/telemetry and
+ * /batteries/health/trend both anchor to real time, which runs ahead of the
+ * data by a day or more, while /vehicles/{id}/telemetry anchors to the
+ * latest scored date. Sizing the request off real "today" rather than the
+ * selected `to` covers both cases, so the fetched window always reaches
+ * `from` instead of landing short and leaving the start of the chosen range
+ * blank. Capped at the endpoint's own maximum.
+ */
+export function coverageDays(from: string, maxDays: number): number {
+  return Math.min(maxDays, spanDays(from, todayYmd()));
+}
+
 /** One entry per day of the window: the API's own point for that date, or a
  * date-only placeholder (rendered as a gap) when it has none — e.g. the user
  * picked a start date further back than the API's own fetch cap allows. */

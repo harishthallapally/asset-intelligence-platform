@@ -25,7 +25,7 @@ import {
   fetchVehicles,
 } from "./client";
 import { buildDemoCommandCenter } from "./demoSource";
-import { MAX_TREND_FETCH_DAYS, fitToRange, spanDays } from "../dateRange";
+import { MAX_TREND_FETCH_DAYS, coverageDays, fitToRange } from "../dateRange";
 import type { SelectedRange } from "../selectedRange";
 import {
   mergeChargerOperationsRisk,
@@ -78,11 +78,10 @@ export async function getDashboardData(
 ): Promise<DashboardResult> {
   if (!apiBaseUrl()) return demoResult("API_BASE_URL is not set");
 
-  // The trend endpoint only ever returns trailing days from the service's own
-  // clock (it has no from/to parameters), capped at MAX_TREND_FETCH_DAYS —
-  // fetch the largest allowed window so fitToRange has enough history to
-  // slice the user's chosen range out of.
-  const trendFetchDays = Math.min(MAX_TREND_FETCH_DAYS, spanDays(range.from, range.to));
+  // The trend endpoint only ever returns trailing days (it has no from/to
+  // parameters), anchored to the service's real clock rather than its latest
+  // scored date — see coverageDays.
+  const trendFetchDays = coverageDays(range.from, MAX_TREND_FETCH_DAYS);
 
   try {
     const [

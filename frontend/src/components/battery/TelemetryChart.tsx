@@ -28,7 +28,7 @@ export function TelemetryChart<T extends { date: string }>({
   return (
     <div className="h-[168px]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: -14 }}>
+        <AreaChart data={data} margin={{ top: 4, right: 22, bottom: 0, left: -14 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.22} />
@@ -41,15 +41,21 @@ export function TelemetryChart<T extends { date: string }>({
             tickFormatter={(iso: string) =>
               new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
             }
-            interval={Math.max(1, Math.floor(data.length / 5))}
+            // A fixed step (e.g. every 3rd point) can land short of the last
+            // index for some range lengths, silently dropping the end date
+            // the filter was set to — "preserveStartEnd" always keeps the
+            // first and last ticks and only thins the ones in between.
+            interval="preserveStartEnd"
             axisLine={{ stroke: "var(--gridline)" }}
             tickLine={false}
             tick={{ fill: "var(--text-muted)", fontSize: 11 }}
-            // The last tick sits flush with the plot's right edge, so its
-            // label would otherwise overflow past the chart and get clipped
-            // (e.g. "Oct 6" rendering as just "Oct") — this reserves room
-            // for it, same as the dashboard's HealthTrendChart.
-            padding={{ left: 4, right: 12 }}
+            // No axis padding: the line/area should run flush to the plot's
+            // true edges (a padded gap here would sit inside the gridlines,
+            // reading as a chunk of "missing" chart rather than a finished
+            // edge). The last tick's label still has room to render in full
+            // ("Oct 6" rather than a clipped "Oct") because the chart's own
+            // right margin, above, is wide enough for it and sits outside
+            // the grid, where empty space reads as a normal label gutter.
           />
           <YAxis
             axisLine={false}

@@ -1,4 +1,4 @@
-import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
+import { MAX_TELEMETRY_FETCH_DAYS, coverageDays, fitToRange } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -51,7 +51,7 @@ export default async function VehicleDetailPage({
   const range = await getPageDateRange();
   const [{ data, error }, { data: telemetry }] = await Promise.all([
     getVehicleDetail(vehicleId),
-    getVehicleTelemetryPoints(vehicleId, Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to))),
+    getVehicleTelemetryPoints(vehicleId, coverageDays(range.from, MAX_TELEMETRY_FETCH_DAYS)),
   ]);
 
   if (error || !data) {

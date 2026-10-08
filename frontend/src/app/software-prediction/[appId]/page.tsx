@@ -1,4 +1,4 @@
-import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
+import { MAX_TELEMETRY_FETCH_DAYS, coverageDays, fitToRange } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -47,7 +47,7 @@ export default async function AppDetailPage({
   const range = await getPageDateRange();
   const [{ data: app, error }, { data: trend }] = await Promise.all([
     getAppDetail(appId),
-    getAppTrend(appId, Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to))),
+    getAppTrend(appId, coverageDays(range.from, MAX_TELEMETRY_FETCH_DAYS)),
   ]);
 
   if (error || !app) {

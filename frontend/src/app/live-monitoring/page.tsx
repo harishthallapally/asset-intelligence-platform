@@ -1,4 +1,4 @@
-import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
+import { MAX_TELEMETRY_FETCH_DAYS, coverageDays, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { Activity, AlertTriangle, Plug, Thermometer } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -18,7 +18,11 @@ export default async function LiveMonitoringPage({
 }) {
   const { station: stationId } = await searchParams;
   const range = await getPageDateRange();
-  const fetchDays = Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to));
+  // The chart's own window; the actual API fetch asks for more (coverageDays)
+  // so the response reaches back to range.from regardless of how the backend
+  // anchors "trailing days" — see coverageDays' doc comment.
+  const displayDays = spanDays(range.from, range.to);
+  const fetchDays = coverageDays(range.from, MAX_TELEMETRY_FETCH_DAYS);
   const { data: allAssets, error } = await getAssetsPage();
 
   if (error || !allAssets) {
@@ -84,7 +88,7 @@ export default async function LiveMonitoringPage({
         {topAtRisk.length > 0 && (
           <Panel
             title="Recent Telemetry — Highest Risk Docks"
-            titleNote={`(daily average, ${fetchDays} day${fetchDays === 1 ? "" : "s"})`}
+            titleNote={`(daily average, ${displayDays} day${displayDays === 1 ? "" : "s"})`}
             action={<Thermometer size={16} className="text-[var(--status-critical)]" />}
           >
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
