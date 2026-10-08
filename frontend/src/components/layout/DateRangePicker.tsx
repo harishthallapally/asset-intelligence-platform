@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Info, Loader2 } from "lucide-react";
-import { DAYS_COOKIE } from "@/lib/dateRange";
+import { CalendarDays, Info, Loader2 } from "lucide-react";
+import { FROM_COOKIE, TO_COOKIE, addDays, spanDays } from "@/lib/dateRange";
 
 const PRESETS = [
   { days: 7, label: "Last 7 days" },
@@ -12,62 +12,62 @@ const PRESETS = [
   { days: 90, label: "Last 90 days" },
 ];
 
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-
-function startOfDay(d: Date): Date {
-  const copy = new Date(d);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+function ymd(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
-function sameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  );
+function fmt(day: string): string {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
-function daysBetween(from: Date, to: Date): number {
-  return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / 86_400_000);
-}
-
-function saveDays(days: number) {
-  document.cookie = `${DAYS_COOKIE}=${days}; path=/; max-age=31536000; samesite=lax`;
-}
-
-/** Monday-first grid for the given month, padded to whole weeks. */
-function monthGrid(month: Date): (Date | null)[] {
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const lead = (first.getDay() + 6) % 7;
-  const total = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const cells: (Date | null)[] = Array.from({ length: lead }, () => null);
-  for (let day = 1; day <= total; day++) {
-    cells.push(new Date(month.getFullYear(), month.getMonth(), day));
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+function saveRange(from: string, to: string) {
+  document.cookie = `${FROM_COOKIE}=${from}; path=/; max-age=31536000; samesite=lax`;
+  document.cookie = `${TO_COOKIE}=${to}; path=/; max-age=31536000; samesite=lax`;
 }
 
 /**
  * Date control for the header.
  *
- * The window always ends today; picking a date sets how far back it starts.
- * The choice is saved in a cookie, so it carries across pages, and every trend
- * chart lays its data out against this window.
+ * Both ends are editable — the end date is no longer pinned to wall-clock
+ * "today". Its ceiling is `latest`: the platform's own latest scored day
+ * (passed in as `dataAsOf`), since the service can run a day or more behind
+ * real time and picking a day past that would just show an empty window.
+ * The choice is saved in a cookie, so it carries across every page, and
+ * every trend/telemetry chart lays its data out against this window.
  */
-export function DateRangePicker({ dataAsOf, days }: { dataAsOf: string | null; days: number }) {
+export function DateRangePicker({
+  dataAsOf,
+  from,
+  to,
+}: {
+  dataAsOf: string | null;
+  from: string;
+  to: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentDays = days;
-  const latest = useMemo(() => startOfDay(new Date()), []);
-  const dataEnd = useMemo(() => {
-    const parsed = dataAsOf ? new Date(dataAsOf) : null;
-    return parsed && !Number.isNaN(parsed.getTime()) ? startOfDay(parsed) : null;
-  }, [dataAsOf]);
+  const latest = useMemo(() => (dataAsOf ? dataAsOf.slice(0, 10) : ymd(new Date())), [dataAsOf]);
 
   const [open, setOpen] = useState(false);
-  const [month, setMonth] = useState(() => new Date(latest.getFullYear(), latest.getMonth(), 1));
+  const [draftFrom, setDraftFrom] = useState(from);
+  const [draftTo, setDraftTo] = useState(to);
+  // Mirrors the server-confirmed from/to into draft state on prop change
+  // (e.g. after a router.refresh()) without an effect — see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  const [syncedFrom, setSyncedFrom] = useState(from);
+  const [syncedTo, setSyncedTo] = useState(to);
+  if (from !== syncedFrom || to !== syncedTo) {
+    setSyncedFrom(from);
+    setSyncedTo(to);
+    setDraftFrom(from);
+    setDraftTo(to);
+  }
   // Changing the range re-renders on the server, which waits on the platform
   // API — without a pending state the control looks unresponsive for seconds.
   const [pending, startTransition] = useTransition();
@@ -88,15 +88,10 @@ export function DateRangePicker({ dataAsOf, days }: { dataAsOf: string | null; d
     };
   }, []);
 
-  const from = useMemo(() => {
-    const d = new Date(latest);
-    d.setDate(d.getDate() - (currentDays - 1));
-    return d;
-  }, [latest, currentDays]);
-
-  function apply(days: number) {
-    const clamped = Math.min(365, Math.max(1, days));
-    saveDays(clamped);
+  function apply(nextFrom: string, nextTo: string) {
+    const safeTo = nextTo > latest ? latest : nextTo;
+    const safeFrom = nextFrom > safeTo ? safeTo : nextFrom;
+    saveRange(safeFrom, safeTo);
     // Older links may still carry ?days=; drop it so the URL matches the range.
     const params = new URLSearchParams(searchParams.toString());
     params.delete("days");
@@ -108,8 +103,21 @@ export function DateRangePicker({ dataAsOf, days }: { dataAsOf: string | null; d
     setOpen(false);
   }
 
-  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const cells = monthGrid(month);
+  function applyPreset(days: number) {
+    apply(addDays(latest, -(days - 1)), latest);
+  }
+
+  function applyDraft() {
+    apply(draftFrom, draftTo);
+  }
+
+  const activePresetDays = useMemo(() => {
+    if (to !== latest) return null;
+    const span = spanDays(from, to);
+    return PRESETS.some((p) => p.days === span) ? span : null;
+  }, [from, to, latest]);
+
+  const draftDirty = draftFrom !== from || draftTo !== to;
 
   return (
     <div ref={ref} className="relative">
@@ -125,77 +133,57 @@ export function DateRangePicker({ dataAsOf, days }: { dataAsOf: string | null; d
         ) : (
           <CalendarDays size={15} className="text-text-muted" />
         )}
-        {pending ? "Updating…" : `${fmt(from)} – ${fmt(latest)}`}
+        {pending ? "Updating…" : `${fmt(from)} – ${fmt(to)}`}
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-label="Select date range"
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[292px] rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-3 shadow-xl shadow-black/10"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-1)] p-3 shadow-xl shadow-black/10"
         >
-          <div className="mb-2 flex items-center justify-between">
-            <button
-              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              aria-label="Previous month"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-[var(--surface-2)]"
-            >
-              <ChevronLeft size={15} />
-            </button>
-            <span className="text-[13px] font-semibold text-text-primary">
-              {month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </span>
-            <button
-              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-              aria-label="Next month"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-text-muted hover:bg-[var(--surface-2)]"
-            >
-              <ChevronRight size={15} />
-            </button>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-[11px] font-medium text-text-muted">
+              Start date
+              <input
+                type="date"
+                value={draftFrom}
+                max={draftTo}
+                onChange={(event) => setDraftFrom(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2 py-1.5 text-[12.5px] text-text-primary"
+              />
+            </label>
+            <label className="block text-[11px] font-medium text-text-muted">
+              End date
+              <input
+                type="date"
+                value={draftTo}
+                min={draftFrom}
+                max={latest}
+                onChange={(event) => setDraftTo(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-1)] px-2 py-1.5 text-[12.5px] text-text-primary"
+              />
+            </label>
           </div>
 
-          <div className="grid grid-cols-7 gap-0.5 text-center">
-            {WEEKDAYS.map((day) => (
-              <span key={day} className="py-1 text-[10px] font-medium uppercase text-text-muted">
-                {day}
-              </span>
-            ))}
-            {cells.map((date, idx) => {
-              if (!date) return <span key={`pad${idx}`} />;
-              const future = date > latest;
-              const inRange = date >= from && date <= latest;
-              const isEnd = sameDay(date, latest);
-              return (
-                <button
-                  key={date.toISOString()}
-                  disabled={future}
-                  onClick={() => apply(daysBetween(date, latest) + 1)}
-                  className="rounded-md py-1.5 text-[12px] tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-30"
-                  style={{
-                    backgroundColor: isEnd
-                      ? "var(--series-1)"
-                      : inRange
-                        ? "color-mix(in srgb, var(--series-1) 14%, transparent)"
-                        : "transparent",
-                    color: isEnd ? "#fff" : inRange ? "var(--series-1)" : "var(--text-secondary)",
-                  }}
-                >
-                  {date.getDate()}
-                </button>
-              );
-            })}
-          </div>
+          <button
+            onClick={applyDraft}
+            disabled={pending || !draftDirty}
+            className="mt-2.5 w-full rounded-lg px-3 py-1.5 text-[12.5px] font-semibold text-white transition-opacity disabled:opacity-40"
+            style={{ backgroundColor: "var(--series-1)" }}
+          >
+            Apply
+          </button>
 
           <div className="mt-3 flex flex-wrap gap-1.5 border-t border-[var(--border-hairline)] pt-3">
             {PRESETS.map((preset) => (
               <button
                 key={preset.days}
-                onClick={() => apply(preset.days)}
+                onClick={() => applyPreset(preset.days)}
                 className="rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors"
                 style={{
-                  backgroundColor:
-                    currentDays === preset.days ? "var(--series-1)" : "var(--surface-2)",
-                  color: currentDays === preset.days ? "#fff" : "var(--text-secondary)",
+                  backgroundColor: activePresetDays === preset.days ? "var(--series-1)" : "var(--surface-2)",
+                  color: activePresetDays === preset.days ? "#fff" : "var(--text-secondary)",
                 }}
               >
                 {preset.label}
@@ -206,12 +194,8 @@ export function DateRangePicker({ dataAsOf, days }: { dataAsOf: string | null; d
           <p className="mt-3 flex gap-1.5 border-t border-[var(--border-hairline)] pt-2.5 text-[11px] leading-relaxed text-text-muted">
             <Info size={12} className="mt-0.5 flex-none" />
             <span>
-              Charts show this range up to today. Current health, risk and alerts reflect the latest
-              scoring run
-              {dataEnd
-                ? ` (${dataEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}); days after that have no data yet`
-                : ""}
-              .
+              Charts and KPIs reflect this exact range. The platform&apos;s latest scoring run is{" "}
+              {fmt(latest)}; dates after that have no data yet.
             </span>
           </p>
         </div>

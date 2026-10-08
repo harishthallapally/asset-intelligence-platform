@@ -1,5 +1,4 @@
-import { fitToRange } from "@/lib/dateRange";
-import { selectedDays } from "@/lib/selectedDays";
+import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -10,7 +9,7 @@ import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
-import { getVehicleDetail, getVehicleTelemetryPoints } from "@/lib/api/resources";
+import { getPageDateRange, getVehicleDetail, getVehicleTelemetryPoints } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
 
@@ -49,10 +48,10 @@ export default async function VehicleDetailPage({
   params: Promise<{ vehicleId: string }>;
 }) {
   const { vehicleId } = await params;
-  const days = await selectedDays();
+  const range = await getPageDateRange();
   const [{ data, error }, { data: telemetry }] = await Promise.all([
     getVehicleDetail(vehicleId),
-    getVehicleTelemetryPoints(vehicleId, days),
+    getVehicleTelemetryPoints(vehicleId, Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to))),
   ]);
 
   if (error || !data) {
@@ -67,7 +66,7 @@ export default async function VehicleDetailPage({
   }
 
   const vehicle = data;
-  const telemetryRows = fitToRange(telemetry ?? [], days);
+  const telemetryRows = fitToRange(telemetry ?? [], range.from, range.to);
 
   const scoredLabel = vehicle.scoredAt ? formatScoredAt(vehicle.scoredAt) : "—";
   const subtitle = vehicle.equipment.firmwareVersion ? `v${vehicle.equipment.firmwareVersion}` : "";

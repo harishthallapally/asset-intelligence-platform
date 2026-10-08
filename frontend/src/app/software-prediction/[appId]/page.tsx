@@ -1,5 +1,4 @@
-import { fitToRange } from "@/lib/dateRange";
-import { selectedDays } from "@/lib/selectedDays";
+import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -10,7 +9,7 @@ import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
-import { getAppDetail, getAppTrend } from "@/lib/api/resources";
+import { getAppDetail, getAppTrend, getPageDateRange } from "@/lib/api/resources";
 import { CLASSIFICATION_TONE, label, platformLabel } from "@/lib/appFormat";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
@@ -45,8 +44,11 @@ export default async function AppDetailPage({
   params: Promise<{ appId: string }>;
 }) {
   const { appId } = await params;
-  const days = await selectedDays();
-  const [{ data: app, error }, { data: trend }] = await Promise.all([getAppDetail(appId), getAppTrend(appId, days)]);
+  const range = await getPageDateRange();
+  const [{ data: app, error }, { data: trend }] = await Promise.all([
+    getAppDetail(appId),
+    getAppTrend(appId, Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to))),
+  ]);
 
   if (error || !app) {
     return (
@@ -56,7 +58,7 @@ export default async function AppDetailPage({
     );
   }
 
-  const points = fitToRange(trend ?? [], days);
+  const points = fitToRange(trend ?? [], range.from, range.to);
   const exitMax = Math.max(1, ...(app.exits?.byReason.map((r) => r.count) ?? [0]));
   const notScored = app.healthClassification?.toUpperCase() === "NOT_SCORED";
   const scoredLabel = app.scoredAt ? formatScoredAt(app.scoredAt) : "—";

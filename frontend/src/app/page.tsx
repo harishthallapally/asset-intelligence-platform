@@ -16,8 +16,7 @@ import {
   type RankedAsset,
 } from "@/components/dashboard/TopRiskAssets";
 import { getDashboardData } from "@/lib/api/dashboard";
-import { selectedDays } from "@/lib/selectedDays";
-import { getTopRiskAssets } from "@/lib/api/resources";
+import { getPageDateRange, getTopRiskAssets } from "@/lib/api/resources";
 import { appPredictedAlerts, operationsRiskHref, rankAlerts } from "@/lib/api/normalise";
 
 /** HIGH or CRITICAL — checked directly against the API's own risk_category
@@ -32,9 +31,9 @@ function isHighRisk(row: { riskCategoryRaw: string | null }): boolean {
 
 export default async function DashboardPage() {
   // The header's date range sets the trend window.
-  const trendDays = await selectedDays();
+  const range = await getPageDateRange();
   const [{ data, stations, chargers, apps }, topRiskRows] = await Promise.all([
-    getDashboardData(trendDays),
+    getDashboardData(range),
     // GET /operations/risk's own cross-asset-type ranking, mix=balanced so
     // batteries (3,124 of them) don't crowd out stations/chargers/docks (26,
     // 390, 390) — the platform's own answer to "what needs attention right

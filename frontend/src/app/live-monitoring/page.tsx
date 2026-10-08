@@ -1,5 +1,4 @@
-import { fitToRange } from "@/lib/dateRange";
-import { selectedDays } from "@/lib/selectedDays";
+import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { Activity, AlertTriangle, Plug, Thermometer } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -8,7 +7,7 @@ import { ApiErrorState } from "@/components/ui/ApiErrorState";
 import { StatCard } from "@/components/ui/StatCard";
 import { AssetsRiskTable } from "@/components/live/AssetsRiskTable";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
-import { getAssetTelemetryPoints, getAssetsPage } from "@/lib/api/resources";
+import { getAssetTelemetryPoints, getAssetsPage, getPageDateRange } from "@/lib/api/resources";
 
 export default async function LiveMonitoringPage({
   searchParams,
@@ -18,7 +17,8 @@ export default async function LiveMonitoringPage({
   searchParams: Promise<{ station?: string }>;
 }) {
   const { station: stationId } = await searchParams;
-  const days = await selectedDays();
+  const range = await getPageDateRange();
+  const fetchDays = Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to));
   const { data: allAssets, error } = await getAssetsPage();
 
   if (error || !allAssets) {
@@ -39,7 +39,7 @@ export default async function LiveMonitoringPage({
   // per-second/minute live stream, only these daily aggregates (see the note
   // below the charts), so this is the closest honest thing to "live".
   const telemetryByAsset = await Promise.all(
-    topAtRisk.map((asset) => getAssetTelemetryPoints(asset.assetId, days)),
+    topAtRisk.map((asset) => getAssetTelemetryPoints(asset.assetId, fetchDays)),
   );
 
   const subtitle = stationId
@@ -84,7 +84,7 @@ export default async function LiveMonitoringPage({
         {topAtRisk.length > 0 && (
           <Panel
             title="Recent Telemetry — Highest Risk Docks"
-            titleNote="(daily average, last 14 days)"
+            titleNote={`(daily average, ${fetchDays} day${fetchDays === 1 ? "" : "s"})`}
             action={<Thermometer size={16} className="text-[var(--status-critical)]" />}
           >
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -96,7 +96,7 @@ export default async function LiveMonitoringPage({
                   </div>
                   {telemetryByAsset[idx].data && telemetryByAsset[idx].data!.length > 0 ? (
                     <TelemetryChart
-                      data={fitToRange(telemetryByAsset[idx].data!, days)}
+                      data={fitToRange(telemetryByAsset[idx].data!, range.from, range.to)}
                       dataKey="temperature"
                       color="var(--status-critical)"
                       unit="°C"

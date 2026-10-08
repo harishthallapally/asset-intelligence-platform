@@ -1,41 +1,57 @@
-// The header's date filter: a window of `days` ending today (?days=, default 7).
-// The API serves history as "the last N days of data", which can end before
-// today, so charts fetch N days and are then laid out against the real
-// calendar — days the API has no data for stay empty rather than being filled.
+// The header's date filter: an explicit start/end range the user can set on
+// both ends, rather than a day-count that always ended at wall-clock "today".
+// The platform's own data can lag behind real time (see selectedRange.ts), so
+// callers compare against the service's latest scored date, never `new Date()`.
 
-export const DEFAULT_DAYS = 7;
-const FLEET_TIME_ZONE = "Asia/Kolkata";
+export const DEFAULT_WINDOW_DAYS = 7;
 
-export function parseDays(raw: string | string[] | undefined): number {
-  const value = Number(Array.isArray(raw) ? raw[0] : raw);
-  return Number.isFinite(value) && value >= 1 ? Math.min(365, Math.round(value)) : DEFAULT_DAYS;
+/** Hard ceilings from the live API's own query-parameter validation:
+ * /batteries/health/trend's `days` tops out at 30; every per-asset telemetry
+ * endpoint (/vehicles, /batteries, /apps, /assets) tops out at 180. Fetches
+ * request the largest allowed window so fitToRange always has enough history
+ * on hand to slice the user's chosen from/to out of. */
+export const MAX_TREND_FETCH_DAYS = 30;
+export const MAX_TELEMETRY_FETCH_DAYS = 180;
+
+export const FROM_COOKIE = "range_from";
+export const TO_COOKIE = "range_to";
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Validates a cookie/query value as a plain YYYY-MM-DD date, else null. */
+export function parseDateParam(raw: string | string[] | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value && DATE_RE.test(value) ? value : null;
 }
 
-function ymd(date: Date): string {
-  // en-CA formats as YYYY-MM-DD.
-  return date.toLocaleDateString("en-CA", { timeZone: FLEET_TIME_ZONE });
+export function addDays(day: string, delta: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
 }
 
-/** Every calendar day in the window, oldest first, as YYYY-MM-DD. */
-export function rangeDays(days: number, today: Date = new Date()): string[] {
-  const end = new Date(`${ymd(today)}T00:00:00Z`);
-  return Array.from({ length: days }, (_, i) => {
-    const d = new Date(end);
-    d.setUTCDate(end.getUTCDate() - (days - 1 - i));
-    return d.toISOString().slice(0, 10);
-  });
+/** Inclusive day count spanned by a from/to pair. */
+export function spanDays(from: string, to: string): number {
+  const start = new Date(`${from}T00:00:00Z`).getTime();
+  const end = new Date(`${to}T00:00:00Z`).getTime();
+  return Math.max(1, Math.round((end - start) / 86_400_000) + 1);
+}
+
+/** Every calendar day between from and to inclusive, oldest first, YYYY-MM-DD. */
+export function daysInRange(from: string, to: string): string[] {
+  return Array.from({ length: spanDays(from, to) }, (_, i) => addDays(from, i));
 }
 
 /** One entry per day of the window: the API's own point for that date, or a
- * date-only placeholder (rendered as a gap) when it has none. */
+ * date-only placeholder (rendered as a gap) when it has none — e.g. the user
+ * picked a start date further back than the API's own fetch cap allows. */
 export function fitToRange<T extends { date: string }>(
   points: T[],
-  days: number,
+  from: string,
+  to: string,
 ): (Partial<T> & { date: string })[] {
   const byDay = new Map(points.map((p) => [p.date.slice(0, 10), p]));
-  return rangeDays(days).map((day) => byDay.get(day) ?? ({ date: `${day}T00:00:00` } as Partial<T> & { date: string }));
+  return daysInRange(from, to).map(
+    (day) => byDay.get(day) ?? ({ date: `${day}T00:00:00` } as Partial<T> & { date: string }),
+  );
 }
-
-/** The picker also stores its choice here, so the range carries across pages
- * instead of resetting whenever a link drops the ?days= parameter. */
-export const DAYS_COOKIE = "range_days";

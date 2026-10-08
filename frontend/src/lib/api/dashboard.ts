@@ -25,7 +25,8 @@ import {
   fetchVehicles,
 } from "./client";
 import { buildDemoCommandCenter } from "./demoSource";
-import { fitToRange } from "../dateRange";
+import { MAX_TREND_FETCH_DAYS, fitToRange, spanDays } from "../dateRange";
+import type { SelectedRange } from "../selectedRange";
 import {
   mergeChargerOperationsRisk,
   mergeStationOperationsRisk,
@@ -73,9 +74,15 @@ function demoResult(reason: string): DashboardResult {
 }
 
 export async function getDashboardData(
-  trendDays = 7,
+  range: SelectedRange,
 ): Promise<DashboardResult> {
   if (!apiBaseUrl()) return demoResult("API_BASE_URL is not set");
+
+  // The trend endpoint only ever returns trailing days from the service's own
+  // clock (it has no from/to parameters), capped at MAX_TREND_FETCH_DAYS —
+  // fetch the largest allowed window so fitToRange has enough history to
+  // slice the user's chosen range out of.
+  const trendFetchDays = Math.min(MAX_TREND_FETCH_DAYS, spanDays(range.from, range.to));
 
   try {
     const [
@@ -95,7 +102,7 @@ export async function getDashboardData(
       fetchCommandCenter(),
       fetchHealthDistribution().catch(() => null),
       fetchRiskSummary().catch(() => null),
-      fetchBatteryHealthTrend(trendDays).catch(() => null),
+      fetchBatteryHealthTrend(trendFetchDays).catch(() => null),
       fetchStations().catch(() => []),
       fetchChargers().catch(() => []),
       // Each asset_type filter on GET /operations/risk returns that type's
@@ -153,7 +160,10 @@ export async function getDashboardData(
               predictedFailures: riskSummary.predicted_failures.count,
             }
           : null,
-        healthTrend: trend && trend.length > 0 ? normaliseTrend(fitToRange(trend, trendDays)) : data.healthTrend,
+        healthTrend:
+          trend && trend.length > 0
+            ? normaliseTrend(fitToRange(trend, range.from, range.to))
+            : data.healthTrend,
         vehicles: vehicleSummary
           ? {
               total: vehicleSummary.total,

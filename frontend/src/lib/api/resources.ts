@@ -37,6 +37,7 @@ import {
   fetchVehicleTelemetry,
 } from "./client";
 import type { ApiAppFleetSummary, ApiBatteryCounts, ApiVehicleFleetSummary } from "./types";
+import { selectedRange, type SelectedRange } from "../selectedRange";
 import {
   aggregateStationTelemetry,
   appPredictedAlerts,
@@ -492,6 +493,15 @@ export async function getHeaderContext(): Promise<HeaderContext> {
     alerts: rankAlerts([...alerts.map(normaliseAlert), ...appAlerts]).slice(0, 6),
     dataAsOf: timestamps.length > 0 ? timestamps[timestamps.length - 1] : null,
   };
+}
+
+/** The header's date range for this request, for pages that need it but
+ * don't otherwise call getHeaderContext() themselves — its own fetches are
+ * request-deduped, so this costs nothing extra when a page (via PageShell)
+ * already called it. */
+export async function getPageDateRange(): Promise<SelectedRange> {
+  const header = await getHeaderContext();
+  return selectedRange(header.dataAsOf ? header.dataAsOf.slice(0, 10) : null);
 }
 
 /** GET /assets — the dock register, fully scored (health/anomaly/risk). */

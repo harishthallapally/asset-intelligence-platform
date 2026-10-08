@@ -1,5 +1,4 @@
-import { fitToRange } from "@/lib/dateRange";
-import { selectedDays } from "@/lib/selectedDays";
+import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, LayoutGrid, MapPin, Plug, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -12,7 +11,7 @@ import { RiskPill } from "@/components/ui/RiskPill";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
-import { getStationDetail } from "@/lib/api/resources";
+import { getPageDateRange, getStationDetail } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { healthConditionColor, riskWarningColor } from "@/lib/riskColor";
 
@@ -29,8 +28,11 @@ export default async function StationDetailPage({
   params: Promise<{ stationId: string }>;
 }) {
   const { stationId } = await params;
-  const days = await selectedDays();
-  const { data, error } = await getStationDetail(stationId, days);
+  const range = await getPageDateRange();
+  const { data, error } = await getStationDetail(
+    stationId,
+    Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to)),
+  );
 
   if (error || !data) {
     return (
@@ -41,7 +43,7 @@ export default async function StationDetailPage({
   }
 
   const { station, scoring, telemetry: rawTelemetry } = data;
-  const telemetry = fitToRange(rawTelemetry, days);
+  const telemetry = fitToRange(rawTelemetry, range.from, range.to);
   const scoredLabel = scoring ? formatScoredAt(scoring.scoredAt) : null;
   const location = scoring?.location ?? station.name;
 

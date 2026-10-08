@@ -1,5 +1,4 @@
-import { fitToRange } from "@/lib/dateRange";
-import { selectedDays } from "@/lib/selectedDays";
+import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, BatteryCharging, LayoutGrid, Plug, Sparkles, Warehouse } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -11,7 +10,7 @@ import { StatusDot } from "@/components/ui/StatusDot";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
-import { getChargerDetail } from "@/lib/api/resources";
+import { getChargerDetail, getPageDateRange } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
 
@@ -66,8 +65,12 @@ export default async function ChargerDetailPage({
 }) {
   const { chargerId } = await params;
   const { station: stationId } = await searchParams;
-  const days = await selectedDays();
-  const { data, error } = await getChargerDetail(chargerId, stationId, days);
+  const range = await getPageDateRange();
+  const { data, error } = await getChargerDetail(
+    chargerId,
+    stationId,
+    Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to)),
+  );
 
   if (error || !data) {
     return (
@@ -78,7 +81,7 @@ export default async function ChargerDetailPage({
   }
 
   const { charger, scoring, station, telemetry: rawTelemetry } = data;
-  const telemetry = fitToRange(rawTelemetry, days);
+  const telemetry = fitToRange(rawTelemetry, range.from, range.to);
   const scoredLabel = scoring ? formatScoredAt(scoring.scoredAt) : null;
   const subtitle = scoring?.equipment.firmwareVersion
     ? `Dock ${charger.dockId} · v${scoring.equipment.firmwareVersion}`

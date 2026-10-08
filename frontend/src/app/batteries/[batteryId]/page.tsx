@@ -1,5 +1,4 @@
-import { fitToRange } from "@/lib/dateRange";
-import { selectedDays } from "@/lib/selectedDays";
+import { MAX_TELEMETRY_FETCH_DAYS, fitToRange, spanDays } from "@/lib/dateRange";
 import Link from "next/link";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { PageShell } from "@/components/layout/PageShell";
@@ -10,7 +9,7 @@ import { HealthBar, healthColor } from "@/components/ui/HealthBar";
 import { CreateFieldActionButton } from "@/components/battery/CreateFieldActionButton";
 import { ShareOnWhatsAppButton } from "@/components/battery/ShareOnWhatsAppButton";
 import { TelemetryChart } from "@/components/battery/TelemetryChart";
-import { getBatteryDetail, getBatteryTelemetryPoints } from "@/lib/api/resources";
+import { getBatteryDetail, getBatteryTelemetryPoints, getPageDateRange } from "@/lib/api/resources";
 import { formatScoredAt } from "@/lib/formatScoredAt";
 import { riskWarningColor } from "@/lib/riskColor";
 
@@ -58,10 +57,10 @@ export default async function BatteryDetailPage({
   params: Promise<{ batteryId: string }>;
 }) {
   const { batteryId } = await params;
-  const days = await selectedDays();
+  const range = await getPageDateRange();
   const [{ data: battery, error }, { data: telemetry }] = await Promise.all([
     getBatteryDetail(batteryId),
-    getBatteryTelemetryPoints(batteryId, days),
+    getBatteryTelemetryPoints(batteryId, Math.min(MAX_TELEMETRY_FETCH_DAYS, spanDays(range.from, range.to))),
   ]);
 
   if (error || !battery) {
@@ -73,7 +72,7 @@ export default async function BatteryDetailPage({
   }
 
   const scoredLabel = formatScoredAt(battery.scoredAt);
-  const telemetryRows = fitToRange(telemetry ?? [], days);
+  const telemetryRows = fitToRange(telemetry ?? [], range.from, range.to);
 
   const { manufactureDate, warrantyMonths, warrantyStatus } = battery.equipment;
   const coverageEnd =
