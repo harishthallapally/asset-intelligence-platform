@@ -28,7 +28,7 @@ export function TelemetryChart<T extends { date: string }>({
   return (
     <div className="h-[168px]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -14 }}>
+        <AreaChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: -14 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.22} />
@@ -45,6 +45,11 @@ export function TelemetryChart<T extends { date: string }>({
             axisLine={{ stroke: "var(--gridline)" }}
             tickLine={false}
             tick={{ fill: "var(--text-muted)", fontSize: 11 }}
+            // The last tick sits flush with the plot's right edge, so its
+            // label would otherwise overflow past the chart and get clipped
+            // (e.g. "Oct 6" rendering as just "Oct") — this reserves room
+            // for it, same as the dashboard's HealthTrendChart.
+            padding={{ left: 4, right: 12 }}
           />
           <YAxis
             axisLine={false}
