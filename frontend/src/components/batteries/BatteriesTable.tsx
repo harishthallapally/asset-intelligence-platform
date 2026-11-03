@@ -51,6 +51,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
     {
       key: "batteryId",
       header: "Battery ID",
+      headerClassName: "w-[9%]",
       sortValue: (r) => r.batteryId,
       render: (r) => (
         <Link
@@ -66,6 +67,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
           {
             key: "station",
             header: "Station",
+            headerClassName: "w-[8%]",
             sortValue: (r: BatteryRow) => r.stationId ?? "",
             render: (r: BatteryRow) => r.stationId ?? "—",
           },
@@ -74,6 +76,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
     {
       key: "classification",
       header: "Condition",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.healthClassification,
       render: (r) => (
         <span
@@ -87,6 +90,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
     {
       key: "health",
       header: "Health Score",
+      headerClassName: "w-[14%]",
       sortValue: (r) => r.healthScore,
       render: (r) => <HealthBar score={r.healthScore} />,
     },
@@ -94,6 +98,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
       key: "anomaly",
       header: "Anomaly",
       align: "right",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.anomalyScore,
       render: (r) => (
         <span className="tabular-nums" title={r.anomalySeverity}>
@@ -104,18 +109,21 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
     {
       key: "risk",
       header: "Risk",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.riskScore,
       render: (r) => <RiskPill percent={r.riskScore} category={r.riskCategoryRaw} />,
     },
     {
       key: "priority",
       header: "Priority",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.priority,
       render: (r) => <span className="tabular-nums text-text-secondary">{r.priority}</span>,
     },
     {
       key: "issue",
       header: "Likely Issue",
+      headerClassName: "w-[24%]",
       sortValue: (r) => r.likelyIssue,
       render: (r) => (
         <span className="block max-w-[220px] truncate" title={r.likelyIssue}>
@@ -126,7 +134,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "whitespace-nowrap",
+      headerClassName: "w-[9%] whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "battery", id: r.batteryId }} />,

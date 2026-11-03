@@ -27,6 +27,7 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "assetId",
       header: "App Cohort",
+      headerClassName: "w-[11%]",
       sortValue: (r) => r.assetId,
       render: (r) => (
         <Link
@@ -40,12 +41,14 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "platform",
       header: "Platform",
+      headerClassName: "w-[8%]",
       sortValue: (r) => `${r.platform}-${String(r.osMajor ?? 0).padStart(3, "0")}`,
       render: (r) => platformLabel(r),
     },
     {
       key: "device",
       header: "Device",
+      headerClassName: "w-[11%]",
       sortValue: (r) => r.model ?? "",
       render: (r) => (
         <span className="text-text-secondary">
@@ -56,12 +59,14 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "version",
       header: "Version",
+      headerClassName: "w-[7%]",
       sortValue: (r) => r.version ?? "",
       render: (r) => <span className="font-mono text-[12.5px]">{r.version ?? "—"}</span>,
     },
     {
       key: "installs",
       header: "Installs",
+      headerClassName: "w-[6%]",
       sortValue: (r) => r.installCount ?? 0,
       render: (r) => (
         <span className="tabular-nums">{r.installCount?.toLocaleString("en-IN") ?? "—"}</span>
@@ -70,6 +75,7 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "classification",
       header: "Condition",
+      headerClassName: "w-[7%]",
       sortValue: (r) => r.healthClassification ?? "",
       render: (r) => (
         <span
@@ -87,6 +93,7 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "health",
       header: "Health Score",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.healthScore ?? 0,
       render: (r) =>
         r.healthScore != null ? <HealthBar score={r.healthScore} /> : <span className="text-text-muted">—</span>,
@@ -94,6 +101,7 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "risk",
       header: "Risk",
+      headerClassName: "w-[7%]",
       sortValue: (r) => r.riskScore ?? -1,
       render: (r) =>
         r.riskScore != null ? (
@@ -105,12 +113,14 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "priority",
       header: "Priority",
+      headerClassName: "w-[6%]",
       sortValue: (r) => r.priority ?? "P9",
       render: (r) => <span className="tabular-nums text-text-secondary">{r.priority ?? "—"}</span>,
     },
     {
       key: "issue",
       header: "Predicted Issue",
+      headerClassName: "w-[18%]",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) => (
         <span className="block max-w-[220px] truncate" title={r.likelyIssue ?? undefined}>
@@ -121,7 +131,7 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "whitespace-nowrap",
+      headerClassName: "w-[9%] whitespace-nowrap",
       // The platform has no ai_insights field for app cohorts at all (unlike
       // vehicles/batteries/chargers/stations), so this always reads as
       // empty — kept for visual consistency with the other asset lists.

@@ -47,6 +47,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "assetId",
       header: "Vehicle",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.assetId,
       render: (r) => (
         <Link
@@ -60,6 +61,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "registrationNumber",
       header: "Vehicle Code",
+      headerClassName: "w-[11%]",
       sortValue: (r) => r.registrationNumber ?? "",
       render: (r) => (
         <span className="font-mono text-[12.5px] font-medium tracking-wide text-text-primary">
@@ -70,12 +72,14 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "homeStation",
       header: "Home Station",
+      headerClassName: "w-[9%]",
       sortValue: (r) => r.homeStationId ?? "",
       render: (r) => r.homeStationId ?? "—",
     },
     {
       key: "classification",
       header: "Condition",
+      headerClassName: "w-[9%]",
       sortValue: (r) => r.healthClassification ?? "",
       render: (r) => (
         <span
@@ -94,6 +98,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "health",
       header: "Health Score",
+      headerClassName: "w-[13%]",
       sortValue: (r) => r.healthScore ?? 0,
       render: (r) =>
         r.healthScore != null ? (
@@ -105,6 +110,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "risk",
       header: "Risk",
+      headerClassName: "w-[9%]",
       sortValue: (r) => r.riskScore ?? 0,
       render: (r) =>
         r.riskScore != null ? (
@@ -119,6 +125,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "priority",
       header: "Priority",
+      headerClassName: "w-[7%]",
       sortValue: (r) => r.priority ?? "",
       render: (r) => (
         <span className="tabular-nums text-text-secondary">
@@ -129,6 +136,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "issue",
       header: "Likely Issue",
+      headerClassName: "w-[25%]",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) => (
         <span
@@ -142,7 +150,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "whitespace-nowrap",
+      headerClassName: "w-[9%] whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "vehicle", id: r.assetId }} />,

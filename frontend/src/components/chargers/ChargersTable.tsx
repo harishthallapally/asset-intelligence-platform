@@ -43,6 +43,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "chargerId",
       header: "Charger ID",
+      headerClassName: "w-[9%]",
       sortValue: (r) => r.chargerId,
       render: (r) => (
         <Link
@@ -56,6 +57,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "classification",
       header: "Condition",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.healthClassification ?? "",
       render: (r) =>
         r.healthClassification ? (
@@ -72,6 +74,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "health",
       header: "Health Score",
+      headerClassName: "w-[14%]",
       sortValue: (r) => r.healthScore ?? -1,
       render: (r) => (r.healthScore !== null ? <HealthBar score={r.healthScore} /> : <span className="text-text-muted">—</span>),
     },
@@ -79,6 +82,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
       key: "anomaly",
       header: "Anomaly",
       align: "right",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.anomalyScore ?? -1,
       render: (r) =>
         r.anomalyScore !== null ? (
@@ -92,6 +96,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "risk",
       header: "Risk",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.riskScore ?? -1,
       render: (r) =>
         r.riskScore !== null && r.riskCategoryRaw ? (
@@ -103,12 +108,14 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "priority",
       header: "Priority",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.priority ?? "",
       render: (r) => <span className="tabular-nums text-text-secondary">{r.priority ?? "—"}</span>,
     },
     {
       key: "issue",
       header: "Likely Issue",
+      headerClassName: "w-[32%]",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) =>
         r.likelyIssue ? (
@@ -122,7 +129,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "whitespace-nowrap",
+      headerClassName: "w-[9%] whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "charger", id: r.chargerId, stationId: r.stationId }} />,
