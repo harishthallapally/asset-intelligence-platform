@@ -41,7 +41,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
     {
       key: "stationId",
       header: "Station ID",
-      headerClassName: "w-[11%]",
+      headerClassName: "w-[9%]",
       sortValue: (r) => r.stationId,
       render: (r) => (
         <Link
@@ -57,7 +57,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
       // fails while /stations itself still succeeds.
       key: "classification",
       header: "Condition",
-      headerClassName: "w-[11%]",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.healthClassification ?? "",
       render: (r) =>
         r.healthClassification ? (
@@ -77,7 +77,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
       // different, usually higher, number.
       key: "health",
       header: "Health Score",
-      headerClassName: "w-[15%]",
+      headerClassName: "w-[14%]",
       sortValue: (r) => r.healthScore ?? -1,
       render: (r) => (r.healthScore !== null ? <HealthBar score={r.healthScore} /> : <span className="text-text-muted">—</span>),
     },
@@ -85,7 +85,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
       key: "anomaly",
       header: "Anomaly",
       align: "right",
-      headerClassName: "w-[9%]",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.anomalyScore ?? -1,
       render: (r) =>
         r.anomalyScore !== null ? (
@@ -99,7 +99,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
     {
       key: "risk",
       header: "Risk",
-      headerClassName: "w-[11%]",
+      headerClassName: "w-[10%]",
       sortValue: (r) => r.riskScore ?? -1,
       render: (r) =>
         r.riskScore !== null && r.riskCategoryRaw ? (
@@ -111,14 +111,14 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
     {
       key: "priority",
       header: "Priority",
-      headerClassName: "w-[9%]",
+      headerClassName: "w-[8%]",
       sortValue: (r) => r.priority ?? "",
       render: (r) => <span className="tabular-nums text-text-secondary">{r.priority ?? "—"}</span>,
     },
     {
       key: "issue",
       header: "Likely Issue",
-      headerClassName: "w-[27%]",
+      headerClassName: "w-[13%]",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) =>
         r.likelyIssue ? (
@@ -132,7 +132,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "w-[7%] whitespace-nowrap",
+      headerClassName: "w-[20%] whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "station", id: r.stationId }} />,
@@ -158,6 +158,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
         predicate: (r, value) => bandOf(r.healthClassification) === value,
       }}
       initialSort={{ key: "risk", direction: "desc" }}
+      tableLayout="fixed"
       pageSize={15}
     />
   );

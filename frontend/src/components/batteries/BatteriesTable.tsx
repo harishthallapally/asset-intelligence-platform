@@ -161,6 +161,7 @@ export function BatteriesTable({ rows }: { rows: BatteryRow[] }) {
       }}
       initialFilter={condition && condition in BAND_MEMBERS ? condition : undefined}
       initialSort={{ key: "risk", direction: "desc" }}
+      tableLayout="fixed"
       pageSize={15}
     />
   );

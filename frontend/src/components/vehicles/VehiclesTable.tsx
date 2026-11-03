@@ -184,6 +184,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
         predicate: (r, value) => bandOf(r.healthClassification) === value,
       }}
       initialSort={{ key: "risk", direction: "desc" }}
+      tableLayout="fixed"
       pageSize={15}
     />
   );

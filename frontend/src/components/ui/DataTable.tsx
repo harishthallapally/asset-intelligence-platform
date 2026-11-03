@@ -39,6 +39,15 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   /** Makes the whole row navigate there on click, not just an inline link. */
   rowHref?: (row: T) => string;
+  /**
+   * `table-layout: fixed` — every column's `headerClassName` width becomes
+   * authoritative instead of a soft hint the browser can override based on
+   * content, which is what causes uneven gaps between columns when some
+   * cells are short ("—") and others wrap onto several lines. Only safe to
+   * set when every column here actually has a width class; omit it (default
+   * "auto") for a table that still relies on natural content-based sizing.
+   */
+  tableLayout?: "auto" | "fixed";
 }
 
 export function DataTable<T>({
@@ -53,6 +62,7 @@ export function DataTable<T>({
   pageSize = 15,
   emptyMessage = "Nothing to show.",
   rowHref,
+  tableLayout = "auto",
 }: DataTableProps<T>) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -150,7 +160,7 @@ export function DataTable<T>({
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left">
+        <table className={clsx("w-full text-left", tableLayout === "fixed" && "table-fixed")}>
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-text-muted">
               {columns.map((column) => (
