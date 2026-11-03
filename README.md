@@ -1,8 +1,7 @@
 # Asset Intelligence Platform — Operations Dashboard
 
 Phase 1 POC dashboard for battery-swap station operations. It reads live
-scoring from the platform API and presents the operations-intelligence loop:
-
+scoring from the platform API and presents the operations-intelligence loop
 ```
 Telemetry → Anomaly Detection → Health Score → Predictive Risk
           → AI Explanation → Recommended Field Action → Dashboard
