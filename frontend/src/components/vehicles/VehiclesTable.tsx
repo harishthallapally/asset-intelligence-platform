@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { HealthBar } from "@/components/ui/HealthBar";
+import { PredictionCell } from "@/components/ui/PredictionCell";
 import { RiskPill } from "@/components/ui/RiskPill";
 import type { VehicleRow } from "@/lib/api/normalise";
 
@@ -137,6 +138,13 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
           {r.likelyIssue ?? "—"}
         </span>
       ),
+    },
+    {
+      key: "prediction",
+      header: "Asset Background",
+      // Lazily fetched per visible row (see useAssetInsight) — no bulk field
+      // for this exists, so it can't be sorted without loading every row.
+      render: (r) => <PredictionCell asset={{ type: "vehicle", id: r.assetId }} />,
     },
   ];
 

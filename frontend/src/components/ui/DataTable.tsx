@@ -174,7 +174,12 @@ export function DataTable<T>({
                       <ChevronsUpDown size={11} />
                     </button>
                   ) : (
-                    column.header
+                    // Browsers reset text-transform on <button>, which is
+                    // what quietly cancels this row's `uppercase` for every
+                    // sortable header above — this span restates that reset
+                    // so an unsortable header renders identically instead of
+                    // being the only one left in actual ALL CAPS.
+                    <span className="normal-case">{column.header}</span>
                   )}
                 </th>
               ))}
