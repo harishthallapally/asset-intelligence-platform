@@ -115,7 +115,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "issue",
       header: "Likely Issue",
-      headerClassName: "w-[32%]",
+      headerClassName: "w-[21%]",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) =>
         r.likelyIssue ? (
@@ -129,7 +129,7 @@ export function ChargersTable({ rows }: { rows: ChargerRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "w-[9%] whitespace-nowrap",
+      headerClassName: "w-[20%] whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "charger", id: r.chargerId, stationId: r.stationId }} />,
