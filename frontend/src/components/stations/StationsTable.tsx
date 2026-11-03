@@ -132,7 +132,7 @@ export function StationsTable({ rows }: { rows: StationRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
-      headerClassName: "w-[7%]",
+      headerClassName: "w-[7%] whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "station", id: r.stationId }} />,

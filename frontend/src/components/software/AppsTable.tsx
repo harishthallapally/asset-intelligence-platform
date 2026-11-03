@@ -113,10 +113,19 @@ export function AppsTable({ rows }: { rows: AppRow[] }) {
       header: "Predicted Issue",
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) => (
-        <span className="block max-w-[280px] truncate" title={r.likelyIssue ?? undefined}>
+        <span className="block max-w-[220px] truncate" title={r.likelyIssue ?? undefined}>
           {r.likelyIssue ?? "—"}
         </span>
       ),
+    },
+    {
+      key: "prediction",
+      header: "Asset Background",
+      headerClassName: "whitespace-nowrap",
+      // The platform has no ai_insights field for app cohorts at all (unlike
+      // vehicles/batteries/chargers/stations), so this always reads as
+      // empty — kept for visual consistency with the other asset lists.
+      render: () => <span className="text-text-muted">—</span>,
     },
   ];
 

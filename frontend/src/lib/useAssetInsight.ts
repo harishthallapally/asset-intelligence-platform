@@ -18,6 +18,13 @@ const listeners = new Map<string, Set<() => void>>();
 let pending: AssetInsightRef[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
+// A network hiccup or a cold-starting backend (this platform's own docs note
+// first requests can take 10+ seconds) must not be cached as a permanent
+// "no finding" the way a genuine empty result is — that would need a full
+// page reload to ever correct itself. Failures get a few retries first.
+const MAX_RETRIES = 2;
+const retryCount = new Map<string, number>();
+
 function notify(key: string) {
   listeners.get(key)?.forEach((fn) => fn());
 }
@@ -34,17 +41,29 @@ async function flush() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assets: batch }),
     });
+    if (!response.ok) throw new Error(`asset-insight request failed: HTTP ${response.status}`);
     const data = (await response.json()) as { results?: Record<string, string | null> };
     for (const ref of batch) {
       const key = refKey(ref);
       cache.set(key, data.results?.[key] ?? null);
+      retryCount.delete(key);
       notify(key);
     }
   } catch {
     for (const ref of batch) {
       const key = refKey(ref);
-      cache.set(key, null);
-      notify(key);
+      const attempts = retryCount.get(key) ?? 0;
+      if (attempts < MAX_RETRIES) {
+        retryCount.set(key, attempts + 1);
+        pending.push(ref);
+      } else {
+        retryCount.delete(key);
+        cache.set(key, null);
+        notify(key);
+      }
+    }
+    if (pending.length > 0 && !flushTimer) {
+      flushTimer = setTimeout(flush, 1500);
     }
   }
 }

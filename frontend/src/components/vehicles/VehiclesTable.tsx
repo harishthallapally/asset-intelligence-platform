@@ -132,7 +132,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
       sortValue: (r) => r.likelyIssue ?? "",
       render: (r) => (
         <span
-          className="block max-w-[280px] truncate"
+          className="block max-w-[220px] truncate"
           title={r.likelyIssue ?? undefined}
         >
           {r.likelyIssue ?? "—"}
@@ -142,6 +142,7 @@ export function VehiclesTable({ rows }: { rows: VehicleRow[] }) {
     {
       key: "prediction",
       header: "Asset Background",
+      headerClassName: "whitespace-nowrap",
       // Lazily fetched per visible row (see useAssetInsight) — no bulk field
       // for this exists, so it can't be sorted without loading every row.
       render: (r) => <PredictionCell asset={{ type: "vehicle", id: r.assetId }} />,
