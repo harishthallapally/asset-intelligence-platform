@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export type AssetInsightRef =
-  | { type: "vehicle" | "battery" | "station"; id: string }
+  | { type: "vehicle" | "battery" | "station" | "app"; id: string }
   | { type: "charger"; id: string; stationId: string };
 
 function refKey(ref: AssetInsightRef): string {

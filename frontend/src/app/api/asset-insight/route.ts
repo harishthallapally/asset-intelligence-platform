@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server";
 import {
+  fetchApp,
   fetchBattery,
   fetchChargerDetail,
   fetchStationDetail,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/api/client";
 import type { ApiAIInsight } from "@/lib/api/types";
 
-type AssetType = "vehicle" | "battery" | "charger" | "station";
+type AssetType = "vehicle" | "battery" | "charger" | "station" | "app";
 
 interface AssetRef {
   type: AssetType;
@@ -53,6 +54,8 @@ async function headlineFor(ref: AssetRef): Promise<string | null> {
       return pickHeadline((await fetchBattery(ref.id)).ai_insights);
     case "station":
       return pickHeadline((await fetchStationDetail(ref.id)).ai_insights);
+    case "app":
+      return pickHeadline((await fetchApp(ref.id)).ai_insights);
     case "charger": {
       if (!ref.stationId) return null;
       const chargerUid = `${ref.stationId}-${ref.id}`;
@@ -64,7 +67,9 @@ async function headlineFor(ref: AssetRef): Promise<string | null> {
 }
 
 function isAssetType(value: unknown): value is AssetType {
-  return value === "vehicle" || value === "battery" || value === "charger" || value === "station";
+  return (
+    value === "vehicle" || value === "battery" || value === "charger" || value === "station" || value === "app"
+  );
 }
 
 function parseRefs(raw: unknown): AssetRef[] {

@@ -695,6 +695,10 @@ export interface ApiAppDetail extends ApiApp {
   suggested_checks?: string[] | null;
   risk_note?: string | null;
   exit_breakdown?: ApiAppExitBreakdown | null;
+  /** Non-telemetry findings — same shape and meaning as a vehicle's/
+   * battery's (incident history, root-cause attribution, etc.). Empty when
+   * none apply. */
+  ai_insights?: ApiAIInsight[] | null;
 }
 
 export interface ApiAppFleetSummary {

@@ -1344,6 +1344,9 @@ export interface AppDetailView extends AppRow {
     byReason: { reason: string; count: number }[];
     byScreen: { screen: string; count: number }[];
   } | null;
+  /** Non-telemetry findings — same shape and meaning as a vehicle's/
+   * battery's. Empty when none apply. */
+  aiInsights: AIInsightView[];
 }
 
 export function normaliseAppDetail(detail: ApiAppDetail): AppDetailView {
@@ -1373,6 +1376,9 @@ export function normaliseAppDetail(detail: ApiAppDetail): AppDetailView {
           byScreen: sortedEntries(exits.by_screen).map(([screen, count]) => ({ screen, count })),
         }
       : null,
+    aiInsights: (detail.ai_insights ?? [])
+      .filter((insight) => insight.category !== "telemetry_risk")
+      .map(normaliseAIInsight),
   };
 }
 
